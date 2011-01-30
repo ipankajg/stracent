@@ -1,0 +1,200 @@
+/*++
+
+Copyright (c) 2011, Pankaj Garg (pankajgarg@intellectualheaven.com).
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--*/
+
+/*++
+
+Module Name:
+
+    stgui.rc
+
+Module Description:
+
+	Resource file for GUI version of StraceNt
+
+--*/
+
+#include "windows.h"
+#include "ntverp.h"
+#include "stguires.h"
+#include "strace.rc"
+
+
+//
+// Menu Items
+//
+IDR_MENU MENU DISCARDABLE 
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "Save Trace\tCtrl+S",		    ID_FILE_SAVE
+        MENUITEM SEPARATOR
+        MENUITEM "Exit\tAlt+F4",		        ID_FILE_EXIT
+    END
+    POPUP "&Trace"
+    BEGIN
+        MENUITEM "Launch New Process\tCtrl+N",  ID_TRACE_NEW
+        MENUITEM "Attach to Process\tCtrl+P",   ID_TRACE_ATTACH
+        MENUITEM SEPARATOR
+        MENUITEM "Stop Tracing\tCtrl+Q",        ID_TRACE_STOP
+    END
+    POPUP "&Configure"
+    BEGIN
+        MENUITEM "Filter Options\tCtrl+F",	    ID_CONFIG_FILTER
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "About StraceNT\tCtrl+H",		ID_HELP_ABOUT
+    END
+END
+
+
+//
+// Bitmaps
+//
+IDB_ORANGE_OPTION		BITMAP  DISCARDABLE     "res\\orangeOption.bmp"
+IDB_GREEN_OPTION		BITMAP  DISCARDABLE     "res\\greenOption.bmp"
+IDB_ORANGE_ABOUT		BITMAP  DISCARDABLE     "res\\orangeAbout.bmp"
+IDB_GREEN_ABOUT		    BITMAP  DISCARDABLE     "res\\greenAbout.bmp"
+IDB_ORANGE_STOP		    BITMAP  DISCARDABLE     "res\\orangeStop.bmp"
+IDB_GREEN_STOP		    BITMAP  DISCARDABLE     "res\\greenStop.bmp"
+IDB_IH_SYMBOL		    BITMAP  DISCARDABLE     "res\\ihSymbol.bmp"
+IDB_ABOUT_BTN           BITMAP  DISCARDABLE     "res\\aboutBtn.bmp"
+
+
+//
+// Accelerators
+//
+IDR_MENU ACCELERATORS DISCARDABLE 
+BEGIN
+    "S",            ID_FILE_SAVE, VIRTKEY, CONTROL, NOINVERT
+    
+    "N",            ID_TRACE_NEW, VIRTKEY, CONTROL, NOINVERT
+    "P",            ID_TRACE_ATTACH, VIRTKEY, CONTROL, NOINVERT
+    "Q",            ID_TRACE_STOP, VIRTKEY, CONTROL, NOINVERT
+    
+    "F",            ID_CONFIG_FILTER, VIRTKEY, CONTROL, NOINVERT
+    
+    "H",            ID_HELP_ABOUT, VIRTKEY, CONTROL, NOINVERT
+END
+
+
+
+//
+// Dialog
+//
+IDD_DIALOG_ABOUT DIALOGEX 0, 0, 200, 100
+STYLE WS_POPUP | WS_BORDER | WS_SYSMENU
+FONT 8, "MS Shell Dlg"
+BEGIN
+    GROUPBOX        "",IDC_STATIC,4,3,192,67
+    CONTROL         1107,IDC_STATIC,"Static",SS_BITMAP | 
+                    SS_REALSIZEIMAGE,6,10,68,64, WS_EX_TRANSPARENT
+    LTEXT           "StraceNT - System Call Tracer",IDC_STATIC,74,14,114,8
+    LTEXT           "Version 0.9 (RC)",IDC_STATIC,74,27,114,8
+    LTEXT           "Copyright (c) : Pankaj Garg",IDC_STATIC,74,40,88,8
+    LTEXT           "http://www.intellectualheaven.com",IDC_STATIC_LINK,74,53,114,8,SS_NOTIFY
+    CONTROL         1108,IDOK,"Static",SS_BITMAP | SS_NOTIFY | SS_REALSIZEIMAGE,
+                    60,75,10,10, WS_EX_TRANSPARENT
+END
+
+
+IDD_DIALOG_OPTIONS DIALOG DISCARDABLE 0, 0, 301, 282
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "StraceNT Filter Options"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    CONTROL         "Trace function calls made by main program executable only",
+                    IDC_CHECK_MAIN_EXE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,21,
+                    205,10
+    EDITTEXT        IDC_EDIT_FN_NAME,12,84,100,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_IMP_MOD,12,115,100,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT_LOADED_MOD,12,146,100,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Include",IDC_BTN_INCL,11,165,50,14,0,WS_EX_STATICEDGE
+    PUSHBUTTON      "&Delete",IDC_BTN_DEL_INCL,71,165,50,14,0,WS_EX_STATICEDGE
+    PUSHBUTTON      "&Exclude",IDC_BTN_EXCL,157,165,50,14,0,WS_EX_STATICEDGE
+    PUSHBUTTON      "De&Lete",IDC_BTN_DEL_EXCL,217,165,50,14,0,WS_EX_STATICEDGE
+    PUSHBUTTON      "&Save",IDC_BTN_SAVE,179,255,50,14,0,WS_EX_STATICEDGE
+    PUSHBUTTON      "&Close",IDC_BTN_CLOSE,241,255,50,14,0,WS_EX_STATICEDGE
+    CONTROL         "",IDC_LIST_INCL,"SysListView32",LVS_REPORT | 
+                    LVS_SHOWSELALWAYS | LVS_ALIGNLEFT | LVS_NOCOLUMNHEADER | 
+                    WS_BORDER | WS_TABSTOP,9,184,136,66
+    CONTROL         "",IDC_LIST_EXCL,"SysListView32",LVS_REPORT | 
+                    LVS_SHOWSELALWAYS | LVS_ALIGNLEFT | LVS_NOCOLUMNHEADER | 
+                    WS_BORDER | WS_TABSTOP,155,184,136,66
+    LTEXT           "Function Name (Use * for all functions, Ord#### for functions exported by Ordinal number #### e.g. Ord1234 or Ord0004)",
+                    IDC_STATIC,12,37,272,16
+    LTEXT           "Calling module (Use . to represent main program exe, * to represent all modules)",
+                    IDC_STATIC,12,133,259,8
+    LTEXT           "Module that implements the function (Use * to represent any module)",
+                    IDC_STATIC,12,102,223,8
+    GROUPBOX        "Create a filter file for StraceNT",
+                    IDC_STATIC,4,4,294,272
+    LTEXT           "(You can also use FunctionName=ReturnValue to return a different value e.g. CreateFile=0 to always return 0 from CreateFile, Ord4534=90 to always return 90 from the function exported by Ordinal 4534 or *=-1 to return -1 from all the functions)",
+                    IDC_STATIC,12,56,270,24
+END
+
+IDD_DIALOG_ATTACH_PROCESS DIALOG DISCARDABLE 0, 0, 300, 304
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Attach to Process"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    CONTROL         "",IDC_LIST_PROCESS,"SysListView32",LVS_REPORT | 
+                    LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_ALIGNLEFT | 
+                    LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP | LVS_SINGLESEL,
+                    12,11,276,209
+    PUSHBUTTON      "&Refresh",ID_BTN_REFRESH,12,224,50,14,0,WS_EX_STATICEDGE
+    CONTROL         "Use the following StraceNT Filter File",
+                    IDC_CHECK_FILTER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,
+                    12,245,205,10
+    EDITTEXT        IDC_EDIT_FILTER_FILE,12,260,216,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Browse",ID_BTN_BROWSE,238,260,50,14,0,WS_EX_STATICEDGE
+    PUSHBUTTON      "&Attach",IDOK,93,282,50,14,0,WS_EX_STATICEDGE
+    PUSHBUTTON      "&Cancel",IDCANCEL,157,282,50,14,0,WS_EX_STATICEDGE
+END
+
+IDD_DIALOG_LAUNCH_PROCESS DIALOG DISCARDABLE  0, 0, 209, 55
+STYLE DS_3DLOOK | DS_CONTROL | WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN
+FONT 8, "MS Shell DLG"
+BEGIN
+    LTEXT           "&Arguments:",IDC_STATIC,7,1,47,12,SS_CENTERIMAGE
+    EDITTEXT        IDC_EDIT_ARGS,54,1,155,12,ES_AUTOHSCROLL
+    CONTROL         "Use the following StraceNT Filter File",
+                    IDC_CHECK_FILTER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,
+                    7,20,205,10
+    EDITTEXT        IDC_EDIT_FILTER_FILE,7,32,142,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Browse",ID_BTN_BROWSE,159,32,50,14,0,WS_EX_STATICEDGE
+//
+// Use the commented resource below when Start directory support
+// is added to strace and also when trace child process is available
+//
+//    LTEXT           "&Start directory:",IDC_STATIC,7,22,47,12,SS_CENTERIMAGE
+//    EDITTEXT        IDC_EDIT_START_DIR,54,22,155,12,ES_AUTOHSCROLL
+//    CONTROL         "&Debug child processes also",IDC_EXEOPEN_CHILD_PROCESSES,
+//                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,40,150,12
+//
+END

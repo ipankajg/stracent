@@ -1,0 +1,5 @@
+LIBRARY stserum
+EXPORTS
+IhSerumLoad
+IhSerumUnload
+IhSerumGetRefCount

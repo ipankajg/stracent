@@ -1,0 +1,133 @@
+#++
+#
+# Sample Trace filter file for StraceNT
+# Copyright (c) Pankaj Garg. All rights reserved
+#
+#
+# Usage Notes:
+#
+# You can specify INCLUDES and EXCLUDES in this filter file. You
+# can include/exclude a module (or dll) for tracing or even chose
+# their individual functions for tracing
+#
+# In the filters, you can specify an absolute name like name of a
+# function or dll (eg EnterCriticalSection or kernel32.dll or
+# user32.dll) or you can specify * which means all
+#
+# Rules of prcedence
+#
+# An absolute name takes precedence over a pattern. If you
+# specify EnterCriticalSection in includes and Enter* in excludes
+# then EnterCriticalSection would be included but all other functions
+# which start with Enter would be excluded. Similarly if you specify
+# Load* in includes and LoadLibraryExA in excludes, then all the
+# functions would be included for tracing except LoadLibraryExA
+#
+# This prcedence rule is designed to give a user finer control on
+# inclusion/exclusion of functions for tracing
+#
+# If same absolute name or pattern is specified in both INCLUDES and
+# EXCLUDES then INCLUDES takes preference over EXCLUDES.
+#
+# By default everything is included. You need to specify EXCLUDES
+# to exclude particular modules from tracing
+#
+#--
+
+
+####################################################################
+#     Calling modules, Owner modules and Imported functions        #
+####################################################################
+#                                                                  #
+# The diagram below shows how the modules are loaded and the       #
+# relationship between calling module, owner module and function   #
+# name The sample process is wordpad.exe.                          #
+#                                                                  #
+# Calling/Loaded  Owner/Imported     Imported Functions            #
+# Module          Module                                           #
+# -------------   ---------------    ------------------            #
+# wordpad.exe                                                      #
+#                 |- gdi32.dll       (fgA, fgB, ...)               #
+#                 |- kernel32.dll    (fkA, fkB, ...)               #
+# gdi32.dll                                                        #
+#                 |- kernel32.dll    (fkA, fkX, fkY, ...)          #
+# kernel32.dll                                                     #
+#                 |- ntdll.dll       (fnA, fnB, ...)               #
+# ntdll.dll                                                        #
+#                 |- (No imports - Ntdll doesn't import anything)  #
+#                                                                  #
+# In the above example:                                            #
+# - wordpad.exe uses functions from kernel32.dll and gdi32.dll     #
+# - gdi32.dll also imports function from kernel32.dll              #
+# - kernel32.dll imports functions from ntdll.dll                  #
+# - ntdll.dll doesn't import any functions so it is not dependent  #
+#    on any other module                                           #
+#                                                                  #
+# StraceNT gives you fine control on which functions to trace when #
+# called by which module. For example if you want to trace all     #
+# calls to CreateFileW made by notepad.exe, you can put an include #
+# filter as, .:kernel32.dll:CreateFileW, If you wish to trace all  #
+# calls to CreateFileW from all modules, you can do                #
+# *:kernel32.dll:CreateFileW                                       #
+#                                                                  #
+####################################################################
+
+
+####################################################################
+#           INCLUDES and EXCLUDES FORMAT SPECIFICATION             #
+####################################################################
+#                                                                  #
+# Calling_Module:Owning_Module:Imported_Function                   #
+#                                                                  #
+# Use . for Calling Module to indicate the main program executable #
+# Use * for Calling Module to indicate any calling module          #
+#                                                                  #
+# Use * for Owning Module to trace all the owning modules. For     #
+# example, something like .:*:* will trace all calls from all the  #
+# DLLs made by wordpad.exe (if we are tracing wordpad.exe)         #
+#                                                                  #
+# Use * for Imported Functions to trace all the functions imported #
+#	from the corressponding owning module                      #
+#                                                                  #
+# NOTE: Put each INCLUDE/EXCLUDE entry at a seperate line          #
+#                                                                  #
+####################################################################
+
+
+####################################################################
+#               SAMPLE FOR INCLUDES/EXCLUDES FILTER                #
+####################################################################
+#                                                                  #
+# The sample below uses notepad.exe as an example. It specify inc- #
+# -ludes and excludes a way such that EnterCriticalSection when c- #
+# -alled by notepad.exe is traced and all the functions of user32- #
+# -.dll are traced when called by notepad.exe. If any other module #
+# like user32.dll or gdi32.dll calls EnterCriticalSection, they r  #
+# not traced                                                       #
+#                                                                  #
+####################################################################
+
+
+# Trace EnterCriticialSection calls if called directly by notepad.exe
+INCLUDES=.:kernel32.dll:EnterCriticalSection
+
+
+# Trace ReadProcessMemory calls if called from gdi32.dll
+INCLUDES=gdi32.dll:kernel32.dll:ReadProcessMemory
+
+
+# Trace CreateFileW calls from all the modules
+INCLUDES=*:kernel32.dll:CreateFileW
+
+
+# Trace CreateFileW calls from the main process exe but return -1 if
+# it is called from main process executable
+# To test this run straceNt -f stfilter.txt notepad.exe and you will see
+# that notepad is unable to open any file because we return -1 which
+# is INVALID_HANDLE_VALUE from CreateFileW
+INCLUDES=*:kernel32.dll:CreateFileW=-1
+
+
+# Exclude everything except what is specified in INCLUDES
+EXCLUDES=*:*:*
+
