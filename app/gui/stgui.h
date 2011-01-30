@@ -34,7 +34,7 @@ Module Name:
 
 Module Description:
 
-	STraceNT GUI based interface implementation
+    STraceNT GUI based interface implementation
 
 --*/
 
@@ -47,9 +47,9 @@ Module Description:
 extern CStGuiView *g_pViewObj;
 
 extern LRESULT CALLBACK WndProc(
-						HWND hwnd,
-						UINT nMsg,
-						WPARAM wParam,
-						LPARAM lParam);
+                        HWND hwnd,
+                        UINT nMsg,
+                        WPARAM wParam,
+                        LPARAM lParam);
 
 #endif

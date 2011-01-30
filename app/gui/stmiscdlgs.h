@@ -39,44 +39,44 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 INT_PTR
 CALLBACK
-stAboutDlgProc(	
-		HWND hDlg,
-		UINT msg,
-		WPARAM wParam,
-		LPARAM lParam);
+stAboutDlgProc( 
+        HWND hDlg,
+        UINT msg,
+        WPARAM wParam,
+        LPARAM lParam);
 
 
 typedef struct _ST_ATTACH_PROCESS
 {
-	std::wstring	ProcessId;
-	bool			ApplyFilter;
-	std::wstring	FilterFile;
+    std::wstring    ProcessId;
+    bool            ApplyFilter;
+    std::wstring    FilterFile;
 
 }ST_ATTACH_PROCESS, *PST_ATTACH_PROCESS;
 
 INT_PTR
 CALLBACK
 stProcessAttachDlgProc(
-	HWND hDlg,
-	UINT msg,
-	WPARAM wParam,
-	LPARAM lParam);
+    HWND hDlg,
+    UINT msg,
+    WPARAM wParam,
+    LPARAM lParam);
 
 
 typedef struct _ST_LAUNCH_PROCESS
 {
-	std::wstring	Arguments;
-	bool			ApplyFilter;
-	std::wstring	FilterFile;
+    std::wstring    Arguments;
+    bool            ApplyFilter;
+    std::wstring    FilterFile;
 
 }ST_LAUNCH_PROCESS, *PST_LAUNCH_PROCESS;
 
 INT_PTR
 CALLBACK
 stLaunchProcessDlgProc(
-	HWND hDlg,
-	UINT msg,
-	WPARAM wParam,
-	LPARAM lParam);
+    HWND hDlg,
+    UINT msg,
+    WPARAM wParam,
+    LPARAM lParam);
 
 #endif

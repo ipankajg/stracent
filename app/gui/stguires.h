@@ -34,7 +34,7 @@ Module Name:
 
 Module Description:
 
-	Resource identifier file for the application
+    Resource identifier file for the application
 
 --*/
 
@@ -53,14 +53,14 @@ Module Description:
 //
 // Bitmaps
 //
-#define IDB_GREEN_OPTION				1101
-#define IDB_ORANGE_OPTION				1102
-#define IDB_GREEN_ABOUT					1103
-#define IDB_ORANGE_ABOUT				1104
-#define IDB_GREEN_STOP					1105
-#define IDB_ORANGE_STOP					1106
-#define IDB_IH_SYMBOL					1107
-#define IDB_ABOUT_BTN					1108
+#define IDB_GREEN_OPTION                1101
+#define IDB_ORANGE_OPTION               1102
+#define IDB_GREEN_ABOUT                 1103
+#define IDB_ORANGE_ABOUT                1104
+#define IDB_GREEN_STOP                  1105
+#define IDB_ORANGE_STOP                 1106
+#define IDB_IH_SYMBOL                   1107
+#define IDB_ABOUT_BTN                   1108
 
 
 //
@@ -68,11 +68,11 @@ Module Description:
 //
 #define ID_FILE_SAVE                    1201
 #define ID_FILE_EXIT                    1202
-#define ID_TRACE_NEW					1211
-#define ID_TRACE_ATTACH					1212
-#define ID_TRACE_STOP					1213
-#define ID_CONFIG_FILTER				1221
-#define ID_HELP_ABOUT					1231
+#define ID_TRACE_NEW                    1211
+#define ID_TRACE_ATTACH                 1212
+#define ID_TRACE_STOP                   1213
+#define ID_CONFIG_FILTER                1221
+#define ID_HELP_ABOUT                   1231
 
 
 //
@@ -80,32 +80,32 @@ Module Description:
 //
 #define IDC_STATIC                      -1
 
-#define IDD_DIALOG_ABOUT				1301
+#define IDD_DIALOG_ABOUT                1301
 #define IDC_STATIC_LINK                 1302
 
-#define IDD_DIALOG_OPTIONS				1401
-#define IDC_CHECK_MAIN_EXE				1402
-#define IDC_EDIT_LOADED_MOD				1403
-#define IDC_EDIT_IMP_MOD				1404
-#define IDC_EDIT_FN_NAME				1405
-#define IDC_BTN_INCL					1406
-#define IDC_BTN_EXCL					1407
-#define IDC_BTN_SAVE					1408
-#define IDC_BTN_CLOSE					1409
-#define IDC_BTN_DEL_INCL				1410
-#define IDC_BTN_DEL_EXCL				1411
-#define IDC_LIST_INCL					1412
-#define IDC_LIST_EXCL					1413
+#define IDD_DIALOG_OPTIONS              1401
+#define IDC_CHECK_MAIN_EXE              1402
+#define IDC_EDIT_LOADED_MOD             1403
+#define IDC_EDIT_IMP_MOD                1404
+#define IDC_EDIT_FN_NAME                1405
+#define IDC_BTN_INCL                    1406
+#define IDC_BTN_EXCL                    1407
+#define IDC_BTN_SAVE                    1408
+#define IDC_BTN_CLOSE                   1409
+#define IDC_BTN_DEL_INCL                1410
+#define IDC_BTN_DEL_EXCL                1411
+#define IDC_LIST_INCL                   1412
+#define IDC_LIST_EXCL                   1413
 
-#define IDD_DIALOG_ATTACH_PROCESS		1501
-#define IDC_LIST_PROCESS				1502
-#define IDC_CHECK_FILTER				1503
-#define IDC_EDIT_FILTER_FILE			1504
-#define ID_BTN_BROWSE					1505
-#define ID_BTN_REFRESH					1506
+#define IDD_DIALOG_ATTACH_PROCESS       1501
+#define IDC_LIST_PROCESS                1502
+#define IDC_CHECK_FILTER                1503
+#define IDC_EDIT_FILTER_FILE            1504
+#define ID_BTN_BROWSE                   1505
+#define ID_BTN_REFRESH                  1506
 
-#define IDD_DIALOG_LAUNCH_PROCESS		1601
-#define IDC_EDIT_ARGS					1602
+#define IDD_DIALOG_LAUNCH_PROCESS       1601
+#define IDC_EDIT_ARGS                   1602
 
 #endif
 

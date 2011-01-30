@@ -31,153 +31,153 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 WORD
 ChangeTextClr(
-	WORD colorNew)
+    WORD colorNew)
 /*++
 
 Routine Description:
-	
-	Set the new console text color and return the old
-	console text color
+    
+    Set the new console text color and return the old
+    console text color
 
 Return:
 
-	Previous Color
+    Previous Color
 
 --*/
 {
-	HANDLE conOutputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE conOutputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+    CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 
-	GetConsoleScreenBufferInfo(
-					conOutputHandle,
-					&consoleInfo);
+    GetConsoleScreenBufferInfo(
+                    conOutputHandle,
+                    &consoleInfo);
 
-	SetConsoleTextAttribute(
-						conOutputHandle,
-						colorNew);
+    SetConsoleTextAttribute(
+                        conOutputHandle,
+                        colorNew);
 
-	return consoleInfo.wAttributes;
+    return consoleInfo.wAttributes;
 }
 
 
 void
 CStCuiView::PrintW(
-	WORD			inClr,
-	LPCWSTR	inFormat,
-	va_list			inArgList)
+    WORD            inClr,
+    LPCWSTR inFormat,
+    va_list         inArgList)
 {
-	WORD oldClr = ChangeTextClr(inClr);
-	vwprintf(inFormat, inArgList);
-	ChangeTextClr(oldClr);
+    WORD oldClr = ChangeTextClr(inClr);
+    vwprintf(inFormat, inArgList);
+    ChangeTextClr(oldClr);
 }
 
 
 void
 CStCuiView::PrintA(
-	WORD			inClr,
-	LPCSTR		inFormat,
-	va_list			inArgList)
+    WORD            inClr,
+    LPCSTR      inFormat,
+    va_list         inArgList)
 {
-	WORD oldClr = ChangeTextClr(inClr);
-	vprintf(inFormat, inArgList);
-	ChangeTextClr(oldClr);
+    WORD oldClr = ChangeTextClr(inClr);
+    vprintf(inFormat, inArgList);
+    ChangeTextClr(oldClr);
 }
 
 
 void
 CStCuiView::PrintMessage(
-	LPCWSTR inFormat,
-	...)
+    LPCWSTR inFormat,
+    ...)
 {
-	va_list	argList;
-	va_start(argList, inFormat);
-	PrintW(FOREGROUND_WHITE, inFormat, argList);
+    va_list argList;
+    va_start(argList, inFormat);
+    PrintW(FOREGROUND_WHITE, inFormat, argList);
 }
 
 void
 CStCuiView::PrintTitle(
-	LPCWSTR inFormat,
-	...)
+    LPCWSTR inFormat,
+    ...)
 {
-	va_list	argList;
-	va_start(argList, inFormat);
-	PrintW(FOREGROUND_GREEN | FOREGROUND_INTENSITY, inFormat, argList);
+    va_list argList;
+    va_start(argList, inFormat);
+    PrintW(FOREGROUND_GREEN | FOREGROUND_INTENSITY, inFormat, argList);
 }
 
 
 void
 CStCuiView::PrintTrace(
-	LPCWSTR inFormat,
-	...)
+    LPCWSTR inFormat,
+    ...)
 {
-	va_list	argList;
-	va_start(argList, inFormat);
-	PrintW(FOREGROUND_INTENSITY, inFormat, argList);
+    va_list argList;
+    va_start(argList, inFormat);
+    PrintW(FOREGROUND_INTENSITY, inFormat, argList);
 }
 
 void
 CStCuiView::PrintTraceA(
-	LPCSTR inFormat,
-	...)
+    LPCSTR inFormat,
+    ...)
 {
-	va_list	argList;
-	va_start(argList, inFormat);
-	PrintA(FOREGROUND_INTENSITY, inFormat, argList);
+    va_list argList;
+    va_start(argList, inFormat);
+    PrintA(FOREGROUND_INTENSITY, inFormat, argList);
 }
 
 void
 CStCuiView::PrintTraceOrig(
-	LPCWSTR inFormat,
-	...)
+    LPCWSTR inFormat,
+    ...)
 {
-	va_list	argList;
-	va_start(argList, inFormat);
-	PrintW(FOREGROUND_BLUE | FOREGROUND_INTENSITY, inFormat, argList);
+    va_list argList;
+    va_start(argList, inFormat);
+    PrintW(FOREGROUND_BLUE | FOREGROUND_INTENSITY, inFormat, argList);
 }
 
 void
 CStCuiView::PrintTraceOrigA(
-	LPCSTR inFormat,
-	...)
+    LPCSTR inFormat,
+    ...)
 {
-	va_list	argList;
-	va_start(argList, inFormat);
-	PrintA(FOREGROUND_BLUE | FOREGROUND_INTENSITY, inFormat, argList);
+    va_list argList;
+    va_start(argList, inFormat);
+    PrintA(FOREGROUND_BLUE | FOREGROUND_INTENSITY, inFormat, argList);
 }
 
 
 void
 CStCuiView::PrintWarning(
-	LPCWSTR inFormat,
-	...)
+    LPCWSTR inFormat,
+    ...)
 {
-	va_list	argList;
-	va_start(argList, inFormat);
-	PrintW(
-		FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
-		inFormat,
-		argList);
+    va_list argList;
+    va_start(argList, inFormat);
+    PrintW(
+        FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
+        inFormat,
+        argList);
 }
 
 
 void
 CStCuiView::PrintError(
-	LPCWSTR inFormat,
-	...)
+    LPCWSTR inFormat,
+    ...)
 {
-	va_list	argList;
-	va_start(argList, inFormat);
-	PrintW(FOREGROUND_RED | FOREGROUND_INTENSITY, inFormat, argList);
+    va_list argList;
+    va_start(argList, inFormat);
+    PrintW(FOREGROUND_RED | FOREGROUND_INTENSITY, inFormat, argList);
 }
 
 void
 CStCuiView::PrintErrorA(
-	LPCSTR inFormat,
-	...)
+    LPCSTR inFormat,
+    ...)
 {
-	va_list	argList;
-	va_start(argList, inFormat);
-	PrintA(FOREGROUND_RED | FOREGROUND_INTENSITY, inFormat, argList);
+    va_list argList;
+    va_start(argList, inFormat);
+    PrintA(FOREGROUND_RED | FOREGROUND_INTENSITY, inFormat, argList);
 }
 

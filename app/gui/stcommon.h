@@ -35,15 +35,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 // Macro to calculate count of characters in an array
 //
-#define CHARCOUNT(_sz_)		(sizeof((_sz_)) / sizeof((_sz_)[0]))
+#define CHARCOUNT(_sz_)     (sizeof((_sz_)) / sizeof((_sz_)[0]))
 
 //
 // ANSI/UNICODE independent STL string
 //
 #if _UNICODE || UNICODE
-typedef std::wstring		tstring;
+typedef std::wstring        tstring;
 #else
-typedef std::string			tstring;
+typedef std::string         tstring;
 #endif
 
 //

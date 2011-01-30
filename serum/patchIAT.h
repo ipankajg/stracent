@@ -34,8 +34,8 @@ Module Name:
 
 Module Description:
 
-	Declares structures, functions and data types required for
-	IAT patching
+    Declares structures, functions and data types required for
+    IAT patching
 
 --*/
 
@@ -57,14 +57,14 @@ typedef PVOID  (_stdcall *PFNORIGINAL)(void);
 
 typedef struct _PATCH_CODE
 {
-	struct
-	{
-		BYTE    Call[2];
-		DWORD   pdwAddress;
-		DWORD   dwId;
-		DWORD   dwAddress;
+    struct
+    {
+        BYTE    Call[2];
+        DWORD   pdwAddress;
+        DWORD   dwId;
+        DWORD   dwAddress;
 
-	}Prolog;
+    }Prolog;
 
 }PATCH_CODE;
 
@@ -73,8 +73,8 @@ typedef struct _PATCH_CODE
 
 void
 ihiInitPatchCode(
-	PATCH_CODE		&ioPatchCode,
-	ULONG	inApiIndex);
+    PATCH_CODE      &ioPatchCode,
+    ULONG   inApiIndex);
 
 
 void
@@ -84,23 +84,23 @@ ihiPatchProlog();
 void
 __stdcall
 ihiPatchedFuncEntry(
-	DWORD	**ppStackPos,
-	DWORD	inECX,
-	DWORD	inEDX);
+    DWORD   **ppStackPos,
+    DWORD   inECX,
+    DWORD   inEDX);
 
 
 void
 ihiPatchUnpatchImports(
-	LPCSTR		inModuleBaseName,
-	BYTE	*inModuleBaseAddress,
-	bool			inApplyHook);
+    LPCSTR      inModuleBaseName,
+    BYTE    *inModuleBaseAddress,
+    bool            inApplyHook);
 
 
 void
 WINAPI
 ihiPatchUnpatchModules(
-	HINSTANCE	hDll,
-	bool		inApplyHook);
+    HINSTANCE   hDll,
+    bool        inApplyHook);
 
 
 void

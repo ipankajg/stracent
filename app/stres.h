@@ -32,11 +32,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 // Icons
 //
-#define IDI_APP_ICON					101
+#define IDI_APP_ICON                    101
 
 //
 // Binary resource
 //
-#define IDR_BIN_DLL						201
+#define IDR_BIN_DLL                     201
 
 #endif

@@ -34,24 +34,24 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "strace.h"
 
 // White color definition for console colors
-#define FOREGROUND_WHITE	(FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
+#define FOREGROUND_WHITE    (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
 
 
 class CStCuiView : public CStView
 {
 public:
-	virtual void PrintW(WORD inClr, LPCWSTR inFormat, va_list inArgList);
-	virtual void PrintA(WORD inClr, LPCSTR inFormat, va_list inArgList);
+    virtual void PrintW(WORD inClr, LPCWSTR inFormat, va_list inArgList);
+    virtual void PrintA(WORD inClr, LPCSTR inFormat, va_list inArgList);
 
-	virtual void PrintMessage(LPCWSTR inFormat, ...);
-	virtual void PrintTitle(LPCWSTR inFormat, ...);
-	virtual void PrintTrace(LPCWSTR inFormat, ...);
-	virtual void PrintTraceA(LPCSTR inFormat, ...);
-	virtual void PrintTraceOrig(LPCWSTR inFormat, ...);
-	virtual void PrintTraceOrigA(LPCSTR inFormat, ...);
-	virtual void PrintWarning(LPCWSTR inFormat, ...);
-	virtual void PrintError(LPCWSTR inFormat, ...);
-	virtual void PrintErrorA(LPCSTR inFormat, ...);
+    virtual void PrintMessage(LPCWSTR inFormat, ...);
+    virtual void PrintTitle(LPCWSTR inFormat, ...);
+    virtual void PrintTrace(LPCWSTR inFormat, ...);
+    virtual void PrintTraceA(LPCSTR inFormat, ...);
+    virtual void PrintTraceOrig(LPCWSTR inFormat, ...);
+    virtual void PrintTraceOrigA(LPCSTR inFormat, ...);
+    virtual void PrintWarning(LPCWSTR inFormat, ...);
+    virtual void PrintError(LPCWSTR inFormat, ...);
+    virtual void PrintErrorA(LPCSTR inFormat, ...);
 
 };
 

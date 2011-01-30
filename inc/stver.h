@@ -32,12 +32,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 // Version related Macros
 //
-#define ST_MAKE_STR(_X_)			ST_MAKE_STR_REAL(_X_)
-#define ST_MAKE_STR_REAL(_X_)		#_X_
+#define ST_MAKE_STR(_X_)            ST_MAKE_STR_REAL(_X_)
+#define ST_MAKE_STR_REAL(_X_)       #_X_
 
 #define ST_CASTBYTE(b) ((DWORD)(b) & 0xFF)
-#define ST_DWORD_VERSION(VER_MAJOR, VER_MINOR, VER_BUILD, VER_STEP)	\
-			(ST_CASTBYTE(VER_MAJOR) << 24 | \
+#define ST_DWORD_VERSION(VER_MAJOR, VER_MINOR, VER_BUILD, VER_STEP) \
+            (ST_CASTBYTE(VER_MAJOR) << 24 | \
              ST_CASTBYTE(VER_MINOR) << 16 | \
              ST_CASTBYTE(VER_BUILD) << 8  | \
              ST_CASTBYTE(VER_STEP))
@@ -46,17 +46,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Common version defines for StraceNT
 //
 
-#define COMPANY_NAME		"www.intellectualheaven.com\0"
-#define PRODUCT_NAME		"StraceNT - System Call Tracer for XP, 2K3, Vista and Windows 7.\0"
-#define LEGAL_COPYRIGHT		"Copyright (c), Pankaj Garg (pankajgarg@intellectualheaven.com)\0"
+#define COMPANY_NAME        "www.intellectualheaven.com\0"
+#define PRODUCT_NAME        "StraceNT - System Call Tracer for XP, 2K3, Vista and Windows 7.\0"
+#define LEGAL_COPYRIGHT     "Copyright (c), Pankaj Garg (pankajgarg@intellectualheaven.com)\0"
 
 #define STRACE_VER_MAJOR 0
 #define STRACE_VER_MINOR 9
 #define STRACE_VER_BUILD 0
 #define STRACE_VER_STEP  0
 
-#define STRACE_BIN_VERSION			STRACE_VER_MAJOR,STRACE_VER_MINOR,STRACE_VER_BUILD,STRACE_VER_STEP
-#define STRACE_STR_VERSION			STRACE_VER_MAJOR.STRACE_VER_MINOR.STRACE_VER_BUILD.STRACE_VER_STEP
-#define STRACE_DWORD_VERSION		ST_DWORD_VERSION(STRACE_VER_MAJOR, STRACE_VER_MINOR, STRACE_VER_BUILD, STRACE_VER_STEP)
+#define STRACE_BIN_VERSION          STRACE_VER_MAJOR,STRACE_VER_MINOR,STRACE_VER_BUILD,STRACE_VER_STEP
+#define STRACE_STR_VERSION          STRACE_VER_MAJOR.STRACE_VER_MINOR.STRACE_VER_BUILD.STRACE_VER_STEP
+#define STRACE_DWORD_VERSION        ST_DWORD_VERSION(STRACE_VER_MAJOR, STRACE_VER_MINOR, STRACE_VER_BUILD, STRACE_VER_STEP)
 
 #endif

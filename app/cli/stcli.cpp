@@ -35,7 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 // Application Title
 //
-#define APPLICATION_TITLE		L"StraceNT - System Call Tracer for NT, 2K, XP, 2K3"
+#define APPLICATION_TITLE       L"StraceNT - System Call Tracer for NT, 2K, XP, 2K3"
 
 
 //
@@ -50,24 +50,24 @@ WORD gDefaultColor;
 BOOL
 WINAPI
 stProcessExit(
-	DWORD inCtrlType)
+    DWORD inCtrlType)
 /*++
 
 Routine Description:
 
-	This routine handles the CTRL-C, CTRL-BREAK etc. events. On such event
-	it removes the IAT patches from the process and then return FALSE to
-	invoke system Ctrl handler.
+    This routine handles the CTRL-C, CTRL-BREAK etc. events. On such event
+    it removes the IAT patches from the process and then return FALSE to
+    invoke system Ctrl handler.
 
 Arguments:
 
-	inCtrlType - A well-defined ctrl type code. We don't use it
+    inCtrlType - A well-defined ctrl type code. We don't use it
 
 --*/
 {
-	stPrematureTracerExit();
-	ChangeTextClr(gDefaultColor);
-	return FALSE;
+    stPrematureTracerExit();
+    ChangeTextClr(gDefaultColor);
+    return FALSE;
 }
 
 
@@ -77,37 +77,37 @@ wmain(int argC, wchar_t *argV[])
 /*++
 
 Routine Description:
-	
-	strace application's main entry point. It does following
-	things:
-	- Parse user supplied arguments
-	- Process arguments
-	- Attach to the target application as a debugger
-	- Display debug spew of target application
-	- On process detach, terminate self, but leave target running
+    
+    strace application's main entry point. It does following
+    things:
+    - Parse user supplied arguments
+    - Process arguments
+    - Attach to the target application as a debugger
+    - Display debug spew of target application
+    - On process detach, terminate self, but leave target running
 
 Return:
 
-	0 (zero)	- success
-	non-zero	- failure
+    0 (zero)    - success
+    non-zero    - failure
 
 --*/
 {
-	CStCuiView cuiView;
+    CStCuiView cuiView;
 
-	stInitStrace(&cuiView);
+    stInitStrace(&cuiView);
 
-	wchar_t consoleTitle[MAX_PATH] = {0};
-	GetConsoleTitle(consoleTitle, MAX_PATH - 1);
-	SetConsoleTitle(APPLICATION_TITLE);
-	gDefaultColor = ChangeTextClr(FOREGROUND_WHITE);	
+    wchar_t consoleTitle[MAX_PATH] = {0};
+    GetConsoleTitle(consoleTitle, MAX_PATH - 1);
+    SetConsoleTitle(APPLICATION_TITLE);
+    gDefaultColor = ChangeTextClr(FOREGROUND_WHITE);    
 
-	SetConsoleCtrlHandler(stProcessExit, TRUE);
-	stProcessArguments(argC, argV);
+    SetConsoleCtrlHandler(stProcessExit, TRUE);
+    stProcessArguments(argC, argV);
 
-	ChangeTextClr(gDefaultColor);
-	SetConsoleTitle(consoleTitle);
-	
+    ChangeTextClr(gDefaultColor);
+    SetConsoleTitle(consoleTitle);
+    
 
-	return 0;
+    return 0;
 }

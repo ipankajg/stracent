@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 INT_PTR
 CALLBACK
 stOptionsDlgProc(
-		HWND hDlg,
-		UINT msg,
-		WPARAM wParam,
-		LPARAM lParam);
+        HWND hDlg,
+        UINT msg,
+        WPARAM wParam,
+        LPARAM lParam);

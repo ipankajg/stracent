@@ -34,8 +34,8 @@ Module Name:
 
 Module Description:
 
-	Implements the basic routines required for DLL initialization
-	and uninitialization.
+    Implements the basic routines required for DLL initialization
+    and uninitialization.
 
 --*/
 
@@ -75,69 +75,69 @@ LONG gThreadReferenceCount;
 /*++
 
 Routine Name:
-	
-	IhSerumLoad
+    
+    IhSerumLoad
 
 Routine Description:
-	
-	Patch the given modules of the process
-	in which this DLL is loaded
+    
+    Patch the given modules of the process
+    in which this DLL is loaded
 
 Routine Arguments:
 
-	inFnIncludes
-		Which functions to include
+    inFnIncludes
+        Which functions to include
 
-	inFnExcludes
-		Which functions to exclude
+    inFnExcludes
+        Which functions to exclude
 
 Return:
 
-	none
+    none
 
 --*/
 void
 WINAPI
 IhSerumLoad(
-	LPCSTR		inFnIncludes,
-	LPCSTR		inFnExcludes)
+    LPCSTR      inFnIncludes,
+    LPCSTR      inFnExcludes)
 {
-	char szModuleName[MAX_PATH] = {0};
+    char szModuleName[MAX_PATH] = {0};
 
-	if (GetModuleBaseNameA(
-					GetCurrentProcess(),
-					GetModuleHandle(NULL),
-					szModuleName,
-					sizeof(szModuleName)) > 0)
-	{
-		g_MainExeName = szModuleName;
-	}
-	else
-	{
-		char szStr[512] = {0};
+    if (GetModuleBaseNameA(
+                    GetCurrentProcess(),
+                    GetModuleHandle(NULL),
+                    szModuleName,
+                    sizeof(szModuleName)) > 0)
+    {
+        g_MainExeName = szModuleName;
+    }
+    else
+    {
+        char szStr[512] = {0};
 
-		sprintf(	szStr,
-					"#Failed to obtain the main executable name. Error = %x\n",
-					GetLastError());
+        sprintf(    szStr,
+                    "#Failed to obtain the main executable name. Error = %x\n",
+                    GetLastError());
 
-		OutputDebugStringA(szStr);
-	}
+        OutputDebugStringA(szStr);
+    }
 
-	//
-	// We need to patch based on Module name to patch,
-	// Which modules import table to patch, and finally
-	// which functions to patch
-	//
-	gPatchInclExclMgr.SetInclExclList(
-							inFnIncludes,
-							inFnExcludes);
+    //
+    // We need to patch based on Module name to patch,
+    // Which modules import table to patch, and finally
+    // which functions to patch
+    //
+    gPatchInclExclMgr.SetInclExclList(
+                            inFnIncludes,
+                            inFnExcludes);
 
-	//IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"ihiInitiatePatching called.\n"));
+    //IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"ihiInitiatePatching called.\n"));
 
-	// Initiate the patching process
-	ihiPatchUnpatchModules(g_hInstance, true);
+    // Initiate the patching process
+    ihiPatchUnpatchModules(g_hInstance, true);
 
-	g_processPatched = true;
+    g_processPatched = true;
 }
 
 
@@ -145,26 +145,26 @@ IhSerumLoad(
 /*++
 
 Routine Name:
-	
-	ihiRemovePatching
+    
+    ihiRemovePatching
 
 Routine Description:
-	
-	Remove all the previously patched
-	modules
+    
+    Remove all the previously patched
+    modules
 
 Return:
 
-	none
+    none
 
 --*/
 void
 WINAPI
 IhSerumUnload()
 {
-	ihiPatchUnpatchModules(
-						g_hInstance,
-						false);
+    ihiPatchUnpatchModules(
+                        g_hInstance,
+                        false);
 }
 
 
@@ -178,11 +178,11 @@ IhSerumGetRefCount()
 
 Routine Description:
 
-	Returns the global thread reference count
+    Returns the global thread reference count
 
 --*/
 {
-	return gThreadReferenceCount;
+    return gThreadReferenceCount;
 }
 
 
@@ -190,51 +190,51 @@ Routine Description:
 /*++
 
 Routine Name:
-	
-	DllMain
+    
+    DllMain
 
 Routine Description:
-	
-	Entry point
+    
+    Entry point
 
 Return:
 
-	none
+    none
 
 --*/
 extern "C"
 BOOL
 WINAPI
 DllMain(
-	HINSTANCE	hInstance,
-	DWORD		dwReason,
-	LPVOID		lpReserved)
+    HINSTANCE   hInstance,
+    DWORD       dwReason,
+    LPVOID      lpReserved)
 {
-	g_hInstance = hInstance;
+    g_hInstance = hInstance;
 
-	switch (dwReason)
-	{
-		case DLL_PROCESS_ATTACH:
-		{
-			//IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"Process attach signalled\n"));
-			break;
-		}
-		case DLL_PROCESS_DETACH:
-		{
-			//IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"Process detach signalled\n"));			
-			IhSerumUnload();
-			gThreadReferenceCount = 0;
-			break;
-		}
-		case DLL_THREAD_ATTACH:
-		{	
-			break;
-		}
-		case DLL_THREAD_DETACH:
-		{	
-			break;
-		}
-	}
+    switch (dwReason)
+    {
+        case DLL_PROCESS_ATTACH:
+        {
+            //IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"Process attach signalled\n"));
+            break;
+        }
+        case DLL_PROCESS_DETACH:
+        {
+            //IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"Process detach signalled\n"));           
+            IhSerumUnload();
+            gThreadReferenceCount = 0;
+            break;
+        }
+        case DLL_THREAD_ATTACH:
+        {   
+            break;
+        }
+        case DLL_THREAD_DETACH:
+        {   
+            break;
+        }
+    }
 
     return TRUE;
 }

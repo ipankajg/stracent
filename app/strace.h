@@ -39,15 +39,15 @@ class CStView
 
 public:
 
-	virtual void PrintMessage(LPCWSTR inFormat, ...) = 0;
-	virtual void PrintTitle(LPCWSTR inFormat, ...) = 0;
-	virtual void PrintTrace(LPCWSTR inFormat, ...) = 0;
-	virtual void PrintTraceA(LPCSTR inFormat, ...) = 0;
-	virtual void PrintTraceOrig(LPCWSTR inFormat, ...) = 0;
-	virtual void PrintTraceOrigA(LPCSTR inFormat, ...) = 0;
-	virtual void PrintWarning(LPCWSTR inFormat, ...) = 0;
-	virtual void PrintError(LPCWSTR inFormat, ...) = 0;
-	virtual void PrintErrorA(LPCSTR inFormat, ...) = 0;
+    virtual void PrintMessage(LPCWSTR inFormat, ...) = 0;
+    virtual void PrintTitle(LPCWSTR inFormat, ...) = 0;
+    virtual void PrintTrace(LPCWSTR inFormat, ...) = 0;
+    virtual void PrintTraceA(LPCSTR inFormat, ...) = 0;
+    virtual void PrintTraceOrig(LPCWSTR inFormat, ...) = 0;
+    virtual void PrintTraceOrigA(LPCSTR inFormat, ...) = 0;
+    virtual void PrintWarning(LPCWSTR inFormat, ...) = 0;
+    virtual void PrintError(LPCWSTR inFormat, ...) = 0;
+    virtual void PrintErrorA(LPCSTR inFormat, ...) = 0;
 
 };
 
@@ -62,8 +62,8 @@ stPrematureTracerExit();
 
 void
 stProcessArguments(
-	int argC,
-	wchar_t *argV[]);
+    int argC,
+    wchar_t *argV[]);
 
 BOOL
 stObtainSeDebugPrivilege(void);

@@ -34,7 +34,7 @@ Module Name:
 
 Module Description:
 
-	Declares structures and functions for serum DLL.
+    Declares structures and functions for serum DLL.
 
 --*/
 
@@ -48,8 +48,8 @@ Module Description:
 void
 WINAPI
 IhSerumLoad(
-	LPCSTR		inFnIncludes,
-	LPCSTR		inFnExcludes);
+    LPCSTR      inFnIncludes,
+    LPCSTR      inFnExcludes);
 
 void
 WINAPI

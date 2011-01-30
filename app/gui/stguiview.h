@@ -34,7 +34,7 @@ Module Name:
 
 Module Description:
 
-	GUI Window for strace.
+    GUI Window for strace.
 
 --*/
 
@@ -56,16 +56,16 @@ Module Description:
 // Our Application's Title
 //
 
-#define STRACE_NT_WINDOW_TITLE			L"IntellectualHeaven (R) System Call Tracer for NT, 2K, XP, 2K3"
+#define STRACE_NT_WINDOW_TITLE          L"IntellectualHeaven (R) System Call Tracer for NT, 2K, XP, 2K3"
 
 
 //
 // Unique child window identifiers
 // They should be unique for one parent
 //
-#define IDC_STATUS_BAR				20001
-#define IDC_TOOL_BAR				20002
-#define IDC_TRACE_LIST_VIEW			20003
+#define IDC_STATUS_BAR              20001
+#define IDC_TOOL_BAR                20002
+#define IDC_TRACE_LIST_VIEW         20003
 
 
 //
@@ -73,11 +73,11 @@ Module Description:
 //
 
 // Number of breaks in Status bar
-#define STATUS_BAR_NUM_PARTS					4
-#define STATUS_WIDTH_OF_FIRST_PART				75
-#define STATUS_WIDTH_OF_SECOND_PART				66
-#define STATUS_WIDTH_OF_THIRD_PART				176
-#define STATUS_WIDTH_OF_FOURTH_PART				98
+#define STATUS_BAR_NUM_PARTS                    4
+#define STATUS_WIDTH_OF_FIRST_PART              75
+#define STATUS_WIDTH_OF_SECOND_PART             66
+#define STATUS_WIDTH_OF_THIRD_PART              176
+#define STATUS_WIDTH_OF_FOURTH_PART             98
 
 
 //
@@ -90,86 +90,86 @@ public:
     virtual ~CStGuiView();
 
     void InitInstance();
-	void ExitInstance();
+    void ExitInstance();
 
     LRESULT WndProc(
-				HWND hwnd,
-				UINT nMsg,
-				WPARAM wParam,
-				LPARAM lParam);
+                HWND hwnd,
+                UINT nMsg,
+                WPARAM wParam,
+                LPARAM lParam);
 
-	HWND GetMainWindow();
-	HACCEL GetAccel();
+    HWND GetMainWindow();
+    HACCEL GetAccel();
 
-	virtual void PrintMessage(LPCWSTR inFormat, ...);
-	virtual void PrintTitle(LPCWSTR inFormat, ...);
-	virtual void PrintTrace(LPCWSTR inFormat, ...);
-	virtual void PrintTraceA(LPCSTR inFormat, ...);
-	virtual void PrintTraceOrig(LPCWSTR inFormat, ...);
-	virtual void PrintTraceOrigA(LPCSTR inFormat, ...);
-	virtual void PrintWarning(LPCWSTR inFormat, ...);
-	virtual void PrintError(LPCWSTR inFormat, ...);
-	virtual void PrintErrorA(LPCSTR inFormat, ...);
+    virtual void PrintMessage(LPCWSTR inFormat, ...);
+    virtual void PrintTitle(LPCWSTR inFormat, ...);
+    virtual void PrintTrace(LPCWSTR inFormat, ...);
+    virtual void PrintTraceA(LPCSTR inFormat, ...);
+    virtual void PrintTraceOrig(LPCWSTR inFormat, ...);
+    virtual void PrintTraceOrigA(LPCSTR inFormat, ...);
+    virtual void PrintWarning(LPCWSTR inFormat, ...);
+    virtual void PrintError(LPCWSTR inFormat, ...);
+    virtual void PrintErrorA(LPCSTR inFormat, ...);
 
-	// Called by StraceThread to indicate that it is exiting
-	void SignalStraceThreadExit();
+    // Called by StraceThread to indicate that it is exiting
+    void SignalStraceThreadExit();
 
 private:
     
     void CreateMainWindow();
 
-	int  CreateStatusBar();
-	void UpdateStatusBarData();
+    int  CreateStatusBar();
+    void UpdateStatusBarData();
 
-	bool HandleMenuCommand(WORD	inMenuCmd);
-	void UpdateMenus();
-	void EnableMenuToolbarItem(DWORD inItemId, bool inEnable);
+    bool HandleMenuCommand(WORD inMenuCmd);
+    void UpdateMenus();
+    void EnableMenuToolbarItem(DWORD inItemId, bool inEnable);
     
-	void CreateToolBar();
-	void AddToolbarButton(
-					int			iBitmap,
-					int			idCommand,
-					BYTE		fsState,
-					BYTE		fsStyle,
-					DWORD_PTR	dwData,
-					INT_PTR		iString);
+    void CreateToolBar();
+    void AddToolbarButton(
+                    int         iBitmap,
+                    int         idCommand,
+                    BYTE        fsState,
+                    BYTE        fsStyle,
+                    DWORD_PTR   dwData,
+                    INT_PTR     iString);
 
-	void CreateTraceListCtrl();
+    void CreateTraceListCtrl();
 
-	void LaunchStraceThread(std::wstring& inCmdLine);
-	void KillStraceThread();
+    void LaunchStraceThread(std::wstring& inCmdLine);
+    void KillStraceThread();
 
-	void PrintW(
-			ULONG inPrintWhat,
-			LPCWSTR inFormat,
-			va_list inArgList);
-	void PrintA(
-			ULONG inPrintWhat,
-			LPCSTR inFormat,
-			va_list inArgList);
+    void PrintW(
+            ULONG inPrintWhat,
+            LPCWSTR inFormat,
+            va_list inArgList);
+    void PrintA(
+            ULONG inPrintWhat,
+            LPCSTR inFormat,
+            va_list inArgList);
 
     int SaveAppInformation();
     int LoadAppInformation(RECT *pRect);
 
 
-	//
-	// Window handles and other class data required for our view class
-	//
+    //
+    // Window handles and other class data required for our view class
+    //
     HINSTANCE       m_hInstance;
     HWND            m_hwnd;
     HWND            m_hwndStatus;
-	HWND			m_hwndToolBar;
-	HACCEL			m_hAccel;
+    HWND            m_hwndToolBar;
+    HACCEL          m_hAccel;
 
-	HWND			m_hwndListCtrl;
-	HFONT			m_TraceListFont;
-	HFONT			m_TraceListFontBold;
+    HWND            m_hwndListCtrl;
+    HFONT           m_TraceListFont;
+    HFONT           m_TraceListFontBold;
 
-	HANDLE			mThreadHandle;
-	DWORD			mThreadId;
-	bool			mTraceRunning;
+    HANDLE          mThreadHandle;
+    DWORD           mThreadId;
+    bool            mTraceRunning;
 
-	bool			m_OldComctl32;
+    bool            m_OldComctl32;
 
 };
 

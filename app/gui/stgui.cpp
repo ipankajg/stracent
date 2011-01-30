@@ -34,7 +34,7 @@ Module Name:
 
 Module Description:
 
-	STraceNT GUI based interface implementation
+    STraceNT GUI based interface implementation
 
 --*/
 
@@ -56,19 +56,19 @@ CStGuiView *g_pViewObj = NULL;
 /*++
 
 Routine Name:
-	
-	WndProc
+    
+    WndProc
 
 Routine Description:
-	
-	Our Windows message handling routine. Routes control to
-	our view class's message handling code.
+    
+    Our Windows message handling routine. Routes control to
+    our view class's message handling code.
 
 Returns:
 
-	If a message is handled the return value is zero. Otherwise
-	its non-zero.
-	
+    If a message is handled the return value is zero. Otherwise
+    its non-zero.
+    
 
 --*/
 LRESULT CALLBACK 
@@ -88,17 +88,17 @@ WndProc(    HWND hwnd,
 /*++
 
 Routine Name:
-	
-	WinMain
+    
+    WinMain
 
 Routine Description:
-	
-	Entry point for the application
+    
+    Entry point for the application
 
 Returns:
 
-	<XXX>
-	
+    <XXX>
+    
 
 --*/
 int WINAPI
@@ -107,7 +107,7 @@ WinMain(    HINSTANCE hInstance,
             PSTR  /* szCmdLine */,
             int /* iCmdShow */)
 {
-	int funcResult = 0;
+    int funcResult = 0;
     MSG msg;
 
     g_pViewObj = new CStGuiView(hInstance);
@@ -118,40 +118,40 @@ WinMain(    HINSTANCE hInstance,
                         L"Memory allocation failure.....\n",
                         L"Resource Error",
                         MB_OK);
-		funcResult = 1;
+        funcResult = 1;
         goto funcExit;
     }
     
     g_pViewObj->InitInstance();
 
-	stInitStrace(g_pViewObj);
+    stInitStrace(g_pViewObj);
 
 
     //
     // Message loop
     //
     int status;
-	while ((status = GetMessage(&msg, NULL, 0, 0)) != 0)
+    while ((status = GetMessage(&msg, NULL, 0, 0)) != 0)
     {
-		if (status == -1)
-		{
-			funcResult = -1;
-			goto funcExit;
-		}
+        if (status == -1)
+        {
+            funcResult = -1;
+            goto funcExit;
+        }
 
-		if (!TranslateAccelerator(g_pViewObj->GetMainWindow(), g_pViewObj->GetAccel(), &msg)) 
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
+        if (!TranslateAccelerator(g_pViewObj->GetMainWindow(), g_pViewObj->GetAccel(), &msg)) 
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
     }
 
 funcExit:
 
-	if (g_pViewObj)
-	{
-		delete g_pViewObj;
-	}
+    if (g_pViewObj)
+    {
+        delete g_pViewObj;
+    }
 
     return funcResult;
 }
