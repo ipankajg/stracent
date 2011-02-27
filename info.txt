@@ -1,0 +1,102 @@
+StraceNT:
+=========
+StraceNT is a system call tracer and it can trace all the calls a program makes
+to the functions imported from other DLLs. It is developed by Pankaj Garg for
+IntellectualHeaven (http://www.intellectualheaven.com)
+
+
+Updates:
+========
+Please check http://www.intellectualheaven.com to make sure that you have
+the latest version of StraceNT
+
+
+Installation:
+=============
+For Windows 2000, XP and 2003:
+1. Extract StraceNT.exe and StraceNtX.exe to a directory.
+2. Extract sample filter file stFilter.txt to the same directory.
+
+For Windows NT 4:
+Follow step 1 and 2 above and
+3. Extract psapi.dll (from the folder nt4 in the zip archive) and copy it to windows
+   system32 directory. Normally system32 directory is located in c:\winnt\system32 if
+   you installed windows on C: drive.
+
+
+Features:
+=========
+- Uses IAT patching which is a very efficient way to trace functions
+- Provides excellent include/exclude support to give finer control over
+  tracing
+- Trace functions calls made to DLLs loaded dynamically using LoadLibrary et al.
+- Allows user to specify a different return value from a function
+- Comes in both Graphical UI and command line version
+- 100% free of cost
+
+
+Known Limitation:
+=================
+- Does not trace child processes created by the traced process
+- Does not trace functions which are called by using GetProcAddress method
+
+
+Version:
+========
+v0.8.1 (Beta2) (2005/03/01)
+- Added tracing of DLLs which are loaded dynamically using LoadLibrary
+- Added option for returning a different value from a function
+- Support is added for tracing functions exported by Ordinal
+- Modified inclusion/exclusion to provide much better control
+- Fixed few crashing bugs
+- Made a GUI version of StraceNT also
+
+v0.6.2 (Beta1) (2004/09/22)
+Current version of StraceNT is 0.6 which is also declared Beta1. This means
+that even though the program is throughly tested, there may be some unearthed
+bugs. If you encounter a bug or have a feature request, please drop a mail to
+x_pankaj_x@intellectualheaven.com
+
+
+Supported platforms:
+====================
+Windows NT with Service Pack 6
+Windows 2000
+Windows XP (32-bit)
+Windows 2003 (32-bit)
+Windows XP (64-bit) - For tracing 32bit process *only* running inside wow64
+Windows 2003 (64-bit) - For tracing 32bit process *only* running inside wow64
+
+
+License:
+=========
+These files are distributed under "Shared Binary License 1.0"
+Please take a look at the file binarylicense.txt for details. If this file
+is missing, you can get an electronic copy of the
+same from x_pankaj_x@intellectualheaven.com or visit
+http://www.intellectualheaven.com
+
+
+Warning:
+========
+On windows NT and 2000, it uses windows debug support so if you attach StraceNT
+to a process, the process will die if you kill StraceNT.
+
+
+Usage:
+======
+Run StraceNT.exe from command line without any parameters. StraceNT
+will show its usage details. Alternatively, run StraceNtX which is a
+win32 GUI based version of StraceNT. To filter any particular DLLs or
+Functions, use stFilter.txt as a sample and modify it to your needs.
+
+
+Questions:
+==========
+For questions or suggestions, contact x_pankaj_x@intellectualheaven.com
+
+
+--
+Regards,
+Pankaj Garg
+www.intellectualheaven.com
