@@ -68,15 +68,6 @@ Windows XP (64-bit) - For tracing 32bit process *only* running inside wow64
 Windows 2003 (64-bit) - For tracing 32bit process *only* running inside wow64
 
 
-License:
-=========
-These files are distributed under "Shared Binary License 1.0"
-Please take a look at the file binarylicense.txt for details. If this file
-is missing, you can get an electronic copy of the
-same from x_pankaj_x@intellectualheaven.com or visit
-http://www.intellectualheaven.com
-
-
 Warning:
 ========
 On windows NT and 2000, it uses windows debug support so if you attach StraceNT
@@ -93,7 +84,7 @@ Functions, use stFilter.txt as a sample and modify it to your needs.
 
 Questions:
 ==========
-For questions or suggestions, contact x_pankaj_x@intellectualheaven.com
+For questions or suggestions, contact pankajgarg@intellectualheaven.com
 
 
 --
