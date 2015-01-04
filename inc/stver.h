@@ -48,7 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define COMPANY_NAME        "www.intellectualheaven.com\0"
 #define PRODUCT_NAME        "StraceNT - System Call Tracer for XP, 2K3, Vista and Windows 7.\0"
-#define LEGAL_COPYRIGHT     "Copyright (c), Pankaj Garg (pankajgarg@intellectualheaven.com)\0"
+#define LEGAL_COPYRIGHT     "Copyright (c), Pankaj Garg (pankaj@intellectualheaven.com)\0"
 
 #define STRACE_VER_MAJOR 0
 #define STRACE_VER_MINOR 9
