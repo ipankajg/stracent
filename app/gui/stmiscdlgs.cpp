@@ -1,6 +1,6 @@
 /*++
 
-Copyright (c) 2011, Pankaj Garg (pankajgarg@intellectualheaven.com).
+Copyright (c) 2011, Pankaj Garg <pankaj@intellectualheaven.com>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

@@ -1,6 +1,6 @@
 /*++
 
-Copyright (c) 2011, Pankaj Garg (pankajgarg@intellectualheaven.com).
+Copyright (c) 2011, Pankaj Garg <pankaj@intellectualheaven.com>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -52,7 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define STRACE_VER_MAJOR 0
 #define STRACE_VER_MINOR 9
-#define STRACE_VER_BUILD 0
+#define STRACE_VER_BUILD 1
 #define STRACE_VER_STEP  0
 
 #define STRACE_BIN_VERSION          STRACE_VER_MAJOR,STRACE_VER_MINOR,STRACE_VER_BUILD,STRACE_VER_STEP
