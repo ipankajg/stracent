@@ -39,7 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 INT_PTR
 CALLBACK
-stAboutDlgProc( 
+stAboutDlgProc(
         HWND hDlg,
         UINT msg,
         WPARAM wParam,

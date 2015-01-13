@@ -73,17 +73,17 @@ extern HINSTANCE g_hInstance;
 //
 // Used to maintain the count of number of threads attached to our injector DLL.
 //
-extern LONG gThreadReferenceCount; 
+extern LONG gThreadReferenceCount;
 
 
 /*++
 
 Routine Name:
-    
+
     ihiInitPatchCode
 
 Routine Description:
-    
+
     This initializes the code for patch function prolog
     for patching an API in IAT
 
@@ -118,11 +118,11 @@ ihiInitPatchCode(
 /*++
 
 Routine Name:
-    
+
     ihiPatchProlog
 
 Routine Description:
-    
+
     Patched function prolog. This function is only
     a skelton for managing our patching mechanism.
     Once we patch a function, we manipulate the stack
@@ -154,7 +154,7 @@ ihiPatchProlog()
         pushf
         pushf
 
-        mov     ebx, esp        
+        mov     ebx, esp
         add     ebx, 8
         push    edx
         push    ecx
@@ -177,14 +177,14 @@ ihiPatchProlog()
 /*++
 
 Routine Name:
-    
+
     ihiPatchedFuncEntry
 
 Routine Description:
-    
+
     This routine is called from ihiPatchProlog and
     implements core patching related functionality.
-    We call the original function from inside this 
+    We call the original function from inside this
     function by modifying the stack in such a way
     that we can detect, how much stack the original
     API is popping off.
@@ -202,7 +202,7 @@ Routine Arguments:
     ppStackPos - This points to the stack at the entry
                  of ihiPatchProlog. The stack looks
                  like:
-    
+
                 | ...           |
                 | Parameter n   | } <- This is where i will write
                 | ...           | }    the original return address
@@ -219,12 +219,12 @@ ppStackPos ->   | Ret Addr      | - Return address for us (ihiPatchProlog)
                 | our stack     | - stack for ihiPatchedFuncEntry (because
                 | ...           |   we are naked function)
 
-        
+
     inECX - C++ use ecx to pass this pointer, so we should always
             use correct ecx before calling original function.
 
 Note:
-    
+
     Original return address is the code address where original API is
     supposed to return.
 
@@ -271,7 +271,7 @@ ihiPatchedFuncEntry(
     //
     // Used to store return value of original API
     //
-    PVOID valueReturn = NULL;   
+    PVOID valueReturn = NULL;
 
     //
     // Modified return value if any
@@ -310,7 +310,7 @@ ihiPatchedFuncEntry(
     //
     // Log API Parameters Information
     //
-    funcName = gPatchManager.GetFuncNameAt(dwId);   
+    funcName = gPatchManager.GetFuncNameAt(dwId);
     sprintf(    szStr,
                 "$[T%d] %s(%x, %x, %x, %x, ...) ",
                 GetCurrentThreadId(),
@@ -328,7 +328,7 @@ ihiPatchedFuncEntry(
     // What we do here is kind of tricky. We make space for 100 bytes
     // i.e. 25 paramters on stack. After that we copy the original
     // 100 bytes from the original API stack to this location and call
-    // the original API. After the original API return, we see the 
+    // the original API. After the original API return, we see the
     // difference in esp to determine, how many bytes it popped off
     // because we need to pop off that many bytes once we return from
     // ihiPatchProlog which was our detour function for original API.
@@ -356,10 +356,10 @@ ihiPatchedFuncEntry(
         pushad
         mov     dwESP,      esp
         sub     esp,        nMaxBytesToCopy
-        mov     dwNewESP,   esp     
+        mov     dwNewESP,   esp
     }
-    
-    memcpy((PVOID)dwNewESP, (PVOID)pFirstParam, nMaxBytesToCopy);   
+
+    memcpy((PVOID)dwNewESP, (PVOID)pFirstParam, nMaxBytesToCopy);
 
     //
     // Set last error code before calling the original function
@@ -427,7 +427,7 @@ ihiPatchedFuncEntry(
     {
         //
         // Make the program being traced think as if no debugger
-        // is present. This is necessary because to trace a 
+        // is present. This is necessary because to trace a
         // program we attach to it like a debugger. Some
         // programs which have anti debugger implementation
         // fails if they think a debugger is attached
@@ -490,7 +490,7 @@ ihiPatchedFuncEntry(
                 fnName = (LPSTR)*(pFirstParam+1);
             }
             else
-            {   
+            {
                 sprintf(ordString, "Ord%x", *(pFirstParam+1));
                 fnName = ordString;
                 exportedByOrdinal = true;
@@ -571,11 +571,11 @@ ihiPatchedFuncEntry(
 /*++
 
 Routine Name:
-    
+
     ihiPatchUnpatchImports
 
 Routine Description:
-    
+
     This function can either patch or unpatch a modules
     IAT with our hook functions.
 
@@ -623,7 +623,7 @@ ihiPatchUnpatchImports(
     }
 
     pIID = (PIMAGE_IMPORT_DESCRIPTOR)(inModuleBaseAddress + dwImportTableOffset);
-    
+
     //
     // Loop through the import table and patch all the APIs
     // that are exported by name
@@ -634,7 +634,7 @@ ihiPatchUnpatchImports(
         PIMAGE_THUNK_DATA       pITDA       = NULL;
         PIMAGE_THUNK_DATA       pIINA       = NULL;
         wchar_t pwszModule[MAX_PATH];
-        
+
 
         //
         // return if no first thunk or no orginalFirstThunk
@@ -759,11 +759,11 @@ ihiPatchUnpatchImports(
 /*++
 
 Routine Name:
-    
+
     ihiPatchUnpatchModules
 
 Routine Description:
-    
+
     This function traverse the list of loaded modules
     and invokes ihiPatchUnpatchImports on each module except
     on injector dll, because we don't want to patch
@@ -802,7 +802,7 @@ debug:
     IHU_MODULE_LIST moduleList;
     IhuGetModuleList(GetCurrentProcessId(), moduleList);
 
-    gPatchManager.Lock();   
+    gPatchManager.Lock();
 
     IHU_MODULE_LIST_ITER moduleListIter;
 
@@ -863,7 +863,7 @@ debug:
 
                     gPatchManager.RemoveModuleFromPatchedList(moduleInfo.mModuleHandle);
                 }
-            }       
+            }
         }
     }
 
@@ -883,11 +883,11 @@ debug:
 /*++
 
 Routine Name:
-    
+
     ihiRemoveUnloadedModules
 
 Routine Description:
-    
+
     This function is used to remove unloaded DLLs from
     the patched DLL list that we maintain. This is done
     to handle the cases when someone unloads a DLL using
@@ -914,13 +914,13 @@ ihiRemoveUnloadedModules()
     gPatchManager.Lock();
 
     ULONG moduleCount = gPatchManager.GetPatchedModulesCount();
-    
+
     for (int moduleIndex = moduleCount - 1; moduleIndex >= 0; --moduleIndex)
     {
-        HANDLE moduleHandle = 
+        HANDLE moduleHandle =
                         gPatchManager.GetPatchedModulesHandle(
                                                         moduleIndex);
-        
+
         bool bFound = false;
         IHU_MODULE_LIST_ITER moduleListIter;
 

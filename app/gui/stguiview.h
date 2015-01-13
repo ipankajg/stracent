@@ -115,7 +115,7 @@ public:
     void SignalStraceThreadExit();
 
 private:
-    
+
     void CreateMainWindow();
 
     int  CreateStatusBar();
@@ -124,7 +124,7 @@ private:
     bool HandleMenuCommand(WORD inMenuCmd);
     void UpdateMenus();
     void EnableMenuToolbarItem(DWORD inItemId, bool inEnable);
-    
+
     void CreateToolBar();
     void AddToolbarButton(
                     int         iBitmap,

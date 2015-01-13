@@ -43,7 +43,7 @@ CenterDialog(
 /*++
 
 Routine Description:
-    
+
     Moves the dialog box to the center of its
     parent. If parent is NULL then dialog box
     is moved to the center of the desktop
@@ -56,28 +56,28 @@ Returns:
 {
     HWND hwndOwner;
 
-    if ((hwndOwner = GetParent(hwndDlg)) == NULL) 
+    if ((hwndOwner = GetParent(hwndDlg)) == NULL)
     {
-        hwndOwner = GetDesktopWindow(); 
+        hwndOwner = GetDesktopWindow();
     }
 
     RECT rcOwner;
     RECT rcDlg;
     RECT rc;
 
-    GetWindowRect(hwndOwner, &rcOwner); 
-    GetWindowRect(hwndDlg, &rcDlg); 
-    CopyRect(&rc, &rcOwner); 
+    GetWindowRect(hwndOwner, &rcOwner);
+    GetWindowRect(hwndDlg, &rcDlg);
+    CopyRect(&rc, &rcOwner);
 
     //
-    // Offset the owner and dialog box rectangles so that 
-    // right and bottom values represent the width and 
-    // height, and then offset the owner again to discard 
-    // space taken up by the dialog box. 
+    // Offset the owner and dialog box rectangles so that
+    // right and bottom values represent the width and
+    // height, and then offset the owner again to discard
+    // space taken up by the dialog box.
     //
-    OffsetRect(&rcDlg, -rcDlg.left, -rcDlg.top); 
-    OffsetRect(&rc, -rc.left, -rc.top); 
-    OffsetRect(&rc, -rcDlg.right, -rcDlg.bottom); 
+    OffsetRect(&rcDlg, -rcDlg.left, -rcDlg.top);
+    OffsetRect(&rc, -rc.left, -rc.top);
+    OffsetRect(&rc, -rcDlg.right, -rcDlg.bottom);
 
     if (rc.right < 0)
     {
@@ -89,14 +89,14 @@ Returns:
         rc.bottom = 0;
     }
 
-    // The new position is the sum of half the remaining 
+    // The new position is the sum of half the remaining
     // space and the owner's original position.
     SetWindowPos(
-            hwndDlg, 
-            HWND_TOP, 
-            rcOwner.left + (rc.right / 2), 
-            rcOwner.top + (rc.bottom / 2), 
-            0, 0,          // ignores size arguments 
+            hwndDlg,
+            HWND_TOP,
+            rcOwner.left + (rc.right / 2),
+            rcOwner.top + (rc.bottom / 2),
+            0, 0,          // ignores size arguments
             SWP_NOSIZE);
 
     return;

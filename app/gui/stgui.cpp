@@ -56,11 +56,11 @@ CStGuiView *g_pViewObj = NULL;
 /*++
 
 Routine Name:
-    
+
     WndProc
 
 Routine Description:
-    
+
     Our Windows message handling routine. Routes control to
     our view class's message handling code.
 
@@ -68,10 +68,10 @@ Returns:
 
     If a message is handled the return value is zero. Otherwise
     its non-zero.
-    
+
 
 --*/
-LRESULT CALLBACK 
+LRESULT CALLBACK
 WndProc(    HWND hwnd,
             UINT nMsg,
             WPARAM wParam,
@@ -88,17 +88,17 @@ WndProc(    HWND hwnd,
 /*++
 
 Routine Name:
-    
+
     WinMain
 
 Routine Description:
-    
+
     Entry point for the application
 
 Returns:
 
     <XXX>
-    
+
 
 --*/
 int WINAPI
@@ -121,7 +121,7 @@ WinMain(    HINSTANCE hInstance,
         funcResult = 1;
         goto funcExit;
     }
-    
+
     g_pViewObj->InitInstance();
 
     stInitStrace(g_pViewObj);
@@ -139,7 +139,7 @@ WinMain(    HINSTANCE hInstance,
             goto funcExit;
         }
 
-        if (!TranslateAccelerator(g_pViewObj->GetMainWindow(), g_pViewObj->GetAccel(), &msg)) 
+        if (!TranslateAccelerator(g_pViewObj->GetMainWindow(), g_pViewObj->GetAccel(), &msg))
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);

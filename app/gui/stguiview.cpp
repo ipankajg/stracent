@@ -96,11 +96,11 @@ typedef HRESULT (CALLBACK *PFN_DLL_GET_VERSION)(DLLVERSIONINFO *);
 /*++
 
 Routine Name:
-    
+
     CStGuiView
 
 Routine Description:
-    
+
     Constructor for CStGuiView
 
 --*/
@@ -112,7 +112,7 @@ CStGuiView::CStGuiView(HINSTANCE hInstance)
     m_TraceListFontBold = NULL;
     mTraceRunning       = false;
     m_OldComctl32       = true;
-    
+
     // Common controls must be initialized
     InitCommonControls();
 }
@@ -122,11 +122,11 @@ CStGuiView::CStGuiView(HINSTANCE hInstance)
 /*++
 
 Routine Name:
-    
+
     ~CStGuiView
 
 Routine Description:
-    
+
     Destructor for CStGuiView
 
 --*/
@@ -149,11 +149,11 @@ CStGuiView::~CStGuiView()
 /*++
 
 Routine Name:
-    
+
     GetMainWindow
 
 Routine Description:
-    
+
     Gets handle to the main window
 
 Returns:
@@ -171,11 +171,11 @@ CStGuiView::GetMainWindow()
 /*++
 
 Routine Name:
-    
+
     GetAccel
 
 Routine Description:
-    
+
     Gets handle to loaded accelerator
 
 Returns:
@@ -194,11 +194,11 @@ CStGuiView::GetAccel()
 /*++
 
 Routine Name:
-    
+
     InitInstance
 
 Routine Description:
-    
+
     Called when the application starts. Its job is to create
     and initialize the main window for the application and
     other controls.
@@ -215,7 +215,7 @@ CStGuiView::InitInstance()
 
     if (hComctl32)
     {
-        PFN_DLL_GET_VERSION pfnDllGetVersion = 
+        PFN_DLL_GET_VERSION pfnDllGetVersion =
                                 (PFN_DLL_GET_VERSION)GetProcAddress(
                                                                 hComctl32,
                                                                 "DllGetVersion");
@@ -254,11 +254,11 @@ CStGuiView::InitInstance()
 /*++
 
 Routine Name:
-    
+
     ExitInstance
 
 Routine Description:
-    
+
     Called just before the application is about to exit
     to perform any house-keeping tasks.
 
@@ -281,11 +281,11 @@ CStGuiView::ExitInstance()
 /*++
 
 Routine Name:
-    
+
     CreateMainWindow
 
 Routine Description:
-    
+
     Creates Main Application Window
 
 Returns:
@@ -308,7 +308,7 @@ CStGuiView::CreateMainWindow()
     wndclass.cbClsExtra         = 0;
     wndclass.cbWndExtra         = 0;
     wndclass.hInstance          = m_hInstance;
-    wndclass.hIconSm            = 
+    wndclass.hIconSm            =
     wndclass.hIcon              = LoadIcon(m_hInstance, (LPCTSTR)IDI_APP_ICON);
     wndclass.hCursor            = LoadCursor(NULL, IDC_ARROW);
     wndclass.hbrBackground      = (HBRUSH)GetStockObject(WHITE_BRUSH);
@@ -370,22 +370,22 @@ CStGuiView::CreateMainWindow()
 /*++
 
 Routine Name:
-    
+
     WndProc
 
 Routine Description:
-    
+
     Our Windows message handling routine
 
 Returns:
 
     If a message is handled the return value is zero. Otherwise
     its non-zero.
-    
+
 
 --*/
 LRESULT
-CStGuiView::WndProc(    
+CStGuiView::WndProc(
                 HWND    inHWnd,
                 UINT    nMsg,
                 WPARAM  wParam,
@@ -491,7 +491,7 @@ CStGuiView::WndProc(
 
             int clientAreaHeight    = rectClient.bottom - rectClient.top;
             int clientAreaWidth     = rectClient.right - rectClient.left;
-            
+
             RECT rectToolbar;
             GetClientRect(m_hwndToolBar, &rectToolbar);
 
@@ -500,7 +500,7 @@ CStGuiView::WndProc(
             RECT rectClientStatusBar;
             GetClientRect(m_hwndStatus, &rectClientStatusBar);
 
-            int statusBarHeight = rectClientStatusBar.bottom - rectClientStatusBar.top;         
+            int statusBarHeight = rectClientStatusBar.bottom - rectClientStatusBar.top;
 
             //
             // HACK!
@@ -547,13 +547,13 @@ CStGuiView::WndProc(
         }
         case WM_CHAR:
         {
-            switch (wParam) 
-            { 
+            switch (wParam)
+            {
                 //
                 // Handling of escape key.
                 //
                 case 0x1B:
-                {                    
+                {
                     return 0;
                 }
             }
@@ -578,7 +578,7 @@ CStGuiView::WndProc(
             break;
         }
     }
-    
+
     return DefWindowProc(inHWnd, nMsg, wParam, lParam);
 }
 
@@ -586,11 +586,11 @@ CStGuiView::WndProc(
 /*++
 
 Routine Name:
-    
+
     HandleMenuCommand
 
 Routine Description:
-    
+
     Handles all the menu command for this windows menu
 
 Returns:
@@ -605,7 +605,7 @@ CStGuiView::HandleMenuCommand(
     bool bHandled = true;
 
     switch(inMenuCmd)
-    {   
+    {
         case ID_FILE_SAVE:
         {
             wchar_t fileName[MAX_PATH];
@@ -722,7 +722,7 @@ CStGuiView::HandleMenuCommand(
             ST_LAUNCH_PROCESS launchProcess;
 
             launchProcess.ApplyFilter = false;
-            
+
             wchar_t tempFileName[MAX_PATH] = {0};
 
             OPENFILENAME ofn = {0};
@@ -802,7 +802,7 @@ CStGuiView::LaunchStraceThread(
     wchar_t *cmdLine = new wchar_t[inCmdLine.length() + 1];
     StringCchCopy(cmdLine, inCmdLine.length() + 1, inCmdLine.c_str());
 
-    mThreadHandle = CreateThread(   
+    mThreadHandle = CreateThread(
                             NULL,
                             0,
                             StraceThread,
@@ -840,7 +840,7 @@ CStGuiView::UpdateMenus()
 /*++
 
 Routine Description:
-    
+
     Enable/Disable/Check/Uncheck menus based on the application
     specific logic
 
@@ -894,11 +894,11 @@ Routine Description
 /*++
 
 Routine Name:
-    
+
     CreateStatusBar
 
 Routine Description:
-    
+
     Creates an application specific status bar
 
 Returns:
@@ -916,7 +916,7 @@ CStGuiView::CreateStatusBar()
     //
     // Create status bar window
     //
-    m_hwndStatus = CreateWindowEx( 
+    m_hwndStatus = CreateWindowEx(
                     0,                          // no extended styles
                     STATUSCLASSNAME,            // name of status bar class
                     (LPCTSTR) NULL,             // no text when first created
@@ -990,7 +990,7 @@ CStGuiView::UpdateStatusBarData()
 /*++
 
 Routine Description:
-    
+
     Populate/Update Status bar data
 
 Returns:
@@ -1016,11 +1016,11 @@ Returns:
 /*++
 
 Routine Name:
-    
+
     AddToolbarButton
 
 Routine Description:
-    
+
     Adds a button to the toolbar
 
 Returns:
@@ -1037,7 +1037,7 @@ CStGuiView::AddToolbarButton(
     DWORD_PTR   dwData,
     INT_PTR     iString)
 {
-    SendMessage(m_hwndToolBar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0); 
+    SendMessage(m_hwndToolBar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
 
     TBBUTTON tbb;
 
@@ -1045,7 +1045,7 @@ CStGuiView::AddToolbarButton(
     tbb.idCommand   = idCommand;
     tbb.fsState     = fsState;
     tbb.fsStyle     = fsStyle;
-    tbb.dwData      = dwData; 
+    tbb.dwData      = dwData;
     tbb.iString     = iString;
 
     SendMessage(m_hwndToolBar, TB_ADDBUTTONS, (WPARAM)1, (LPARAM)(LPTBBUTTON)&tbb);
@@ -1057,11 +1057,11 @@ CStGuiView::AddToolbarButton(
 /*++
 
 Routine Name:
-    
+
     CreateToolBar
 
 Routine Description:
-    
+
     Creates a toolbar for the application
 
 Returns:
@@ -1070,14 +1070,14 @@ Returns:
 
 --*/
 void
-CStGuiView::CreateToolBar() 
-{ 
+CStGuiView::CreateToolBar()
+{
     TBADDBITMAP             tbab;
 
     //
     // Create a toolbar
     //
-    m_hwndToolBar = CreateWindowEx( 
+    m_hwndToolBar = CreateWindowEx(
                                 0,
                                 TOOLBARCLASSNAME,
                                 (LPTSTR)NULL,
@@ -1119,7 +1119,7 @@ CStGuiView::CreateToolBar()
     HIMAGELIST himlHot      = ImageList_Duplicate(himlTemp);
 
     HBITMAP hBmp;
-    
+
     hBmp = (HBITMAP)LoadBitmap(m_hInstance, MAKEINTRESOURCE(IDB_GREEN_OPTION));
     int optionImageIndex = ImageList_Add(himlNormal, hBmp, NULL);
     DeleteObject(hBmp);
@@ -1300,7 +1300,7 @@ CStGuiView::SaveAppInformation()
 /*++
 
 Routine Description:
-    
+
     Save the applications information in registry
 
 Returns:
@@ -1310,14 +1310,14 @@ Returns:
 --*/
 {
     DWORD dwStyle = GetWindowLong(m_hwnd, GWL_STYLE);
-    
+
     if (dwStyle)
     {
         if ((dwStyle & WS_MAXIMIZE) == 0)
         {
             RECT rectMain;
             int nRetVal = 0;
-            
+
             if (GetWindowRect(  m_hwnd,
                                 &rectMain))
             {
@@ -1401,7 +1401,7 @@ CStGuiView::LoadAppInformation(RECT *pRect)
 /*++
 
 Routine Description:
-    
+
     Read application information from the registry
 
 Returns:
@@ -1411,7 +1411,7 @@ Returns:
 --*/
 {
     int nRetVal = 0;
-    
+
     HKEY hKey;
     unsigned long nDataSize = 0;
 
@@ -1588,7 +1588,7 @@ Returns:
         {
             newMsg = trcMsg.substr(i_begin, trcMsg.length() - i_begin);
         }
-        
+
 
         newMsg = lastMsg + newMsg;
         lastMsg = "";
@@ -1706,7 +1706,7 @@ Returns:
         {
             newMsg = trcMsg.substr(i_begin, trcMsg.length() - i_begin);
         }
-        
+
 
         newMsg = lastMsg + newMsg;
         lastMsg = L"";

@@ -160,17 +160,17 @@ stOptionsDlgProc(
             LVCOLUMN lvColumn;
             lvColumn.mask       = LVCF_WIDTH;
             lvColumn.cx         = 1;
-            
+
 
             ListView_InsertColumn(
                         GetDlgItem(hDlg, IDC_LIST_INCL), 0, &lvColumn);
 
             ListView_InsertColumn(
                         GetDlgItem(hDlg, IDC_LIST_EXCL), 0, &lvColumn);
-            
+
 
             SetFocus(GetDlgItem(hDlg, IDC_EDIT_FN_NAME));
-            
+
             CenterDialog(hDlg);
 
             break;
@@ -215,7 +215,7 @@ stOptionsDlgProc(
                                 hDlg);
 
                     return TRUE;
-                }               
+                }
                 case IDC_BTN_DEL_INCL:
                 {
                     int nSelectedItem = ListView_GetSelectionMark(GetDlgItem(hDlg, IDC_LIST_INCL));
@@ -284,7 +284,7 @@ stOptionsDlgProc(
                                             hFile,
                                             GetDlgItem(hDlg, IDC_LIST_EXCL),
                                             "EXCLUDES=");
-                            
+
                             CloseHandle(hFile);
                         }
                         else

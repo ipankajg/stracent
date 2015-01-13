@@ -139,7 +139,7 @@ Routine Description:
 --*/
 {
     if (gRemovePatchOnExit)
-    {   
+    {
         if (ghProcess != INVALID_HANDLE_VALUE)
         {
             ihiUninjectDll(
@@ -159,11 +159,11 @@ stShowUsage()
 /*++
 
 Routine Description:
-    
+
     Display usage and syntax for strace
 
 --*/
-{   
+{
     gView->PrintMessage(L"StraceNT [-f <FilterFile>] [[-p <PID>] | [-a <ProcName>] | [<Cmd [...]>]]\n");
     gView->PrintMessage(L"\nOptions:\n\n");
     gView->PrintMessage(L"<FilterFile>   StraceNT filter data file (see stFilter.txt for details)\n");
@@ -181,7 +181,7 @@ stHandleError(
 /*++
 
 Routine Description:
-    
+
     Process StraceNT specific or Windows error code and
     display that error to the user.
 
@@ -203,9 +203,9 @@ Routine Description:
         {
             LPVOID lpMsgBuf = NULL;
 
-            if (FormatMessage( 
-                    FORMAT_MESSAGE_ALLOCATE_BUFFER | 
-                    FORMAT_MESSAGE_FROM_SYSTEM | 
+            if (FormatMessage(
+                    FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                    FORMAT_MESSAGE_FROM_SYSTEM |
                     FORMAT_MESSAGE_IGNORE_INSERTS,
                     NULL,
                     inErrorCode,
@@ -233,7 +233,7 @@ stObtainSeDebugPrivilege(void)
 /*++
 
 Routine Description:
-    
+
     Obtain the debugging privilege for our processes. Without this privilege
     we are not able to debug any services
 
@@ -300,7 +300,7 @@ stAttachDebugger(
 /*++
 
 Routine Description:
-    
+
     Our mini-debugger implementation. It does following
     things:
     - Attach to a running process
@@ -311,7 +311,7 @@ Routine Description:
 Arguments:
 
     processId - PID of the process to attach
-    
+
     fnIncludes - List of include filters
 
     fnExclude - List of exclude filters
@@ -429,7 +429,7 @@ Arguments:
                                                 GetLastError());
                                         return;
                                     }
-                                    
+
                                     CloseHandle(oFile);
                                 }
                                 else
@@ -501,7 +501,7 @@ Arguments:
                     {
                         ghProcess = debugEvent.u.CreateProcessInfo.hProcess;
                     }
-                    //IHU_DBG_LOG(TRC_STRACE, HX_LEVEL_INFO, (L"Create Process\n"));                    
+                    //IHU_DBG_LOG(TRC_STRACE, HX_LEVEL_INFO, (L"Create Process\n"));
                     break;
                 }
                 case EXIT_THREAD_DEBUG_EVENT:
@@ -539,7 +539,7 @@ Arguments:
                     if (debugEvent.u.DebugString.fUnicode)
                     {
                         if (gDbgString[0] == L'$')
-                        {   
+                        {
                             gView->PrintTrace(L"%ws", &gDbgString[1]);
                         }
                         else if (gDbgString[0] == L'#')
@@ -550,12 +550,12 @@ Arguments:
                         {
                             gView->PrintTraceOrig(L"%ws", gDbgString);
                         }
-                        
+
                     }
                     else
                     {
                         if (gDbgString[0] == L'$')
-                        {   
+                        {
                             gView->PrintTraceA("%s", &gDbgString[1]);
                         }
                         else if (gDbgString[0] == L'#')
@@ -604,7 +604,7 @@ stProcessArguments(
 /*++
 
 Routine Description:
-    
+
     Process command line arguments passed to StraceNT and then starts tracing
     the process if required.
 
@@ -628,7 +628,7 @@ Routine Description:
 
     gView->PrintTitle(L"\nIntellectualHeaven (R) System Call Tracer for XP, 2K3, Vista and Windows 7.\n");
     gView->PrintTitle(L"Copyright (C) Pankaj Garg. All rights reserved.\n\n");
-    
+
 
     // We start with index 1 because 0 is the process name
     // itself
@@ -704,7 +704,7 @@ Routine Description:
 
             userAction  = CMD_TRACE_BY_PNAME;
             userParam   = argV[++indexArgs];
-        }       
+        }
         else
         {
             if (userAction != CMD_TRACE_NONE)
@@ -745,13 +745,13 @@ Routine Description:
         // Read this file into memory and read
         // the exclusion, inclusion list
         FILE *filterFile;
-                            
+
         filterFile = _wfopen(filterFileName.c_str(), L"rt");
-        
+
         if (filterFile)
         {
             char szLine[1024];
-            
+
             while (fgets(szLine, 1024, filterFile))
             {
                 std::string filterLine = szLine;
@@ -840,7 +840,7 @@ Routine Description:
             processId = ihiGetProcessIdByName(
                                         (LPCWSTR)userParam.c_str());
         }
-        
+
         if (processId)
         {
             stAttachDebugger(

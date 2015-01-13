@@ -35,7 +35,7 @@ ChangeTextClr(
 /*++
 
 Routine Description:
-    
+
     Set the new console text color and return the old
     console text color
 

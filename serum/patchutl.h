@@ -146,7 +146,7 @@ public:
 
     void
     UnLock();
-    
+
     //
     // Functions for API patching
     //
@@ -154,7 +154,7 @@ public:
     GetPatchedApiArrayAt(
         ULONG inIndex);
 
-    // Fix-Me!!! 
+    // Fix-Me!!!
     // The name of functions below needs to be
     // changed to reflect their meaning more clearly
     //

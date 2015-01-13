@@ -63,11 +63,11 @@ extern std::string g_MainExeName;
 /*++
 
 Routine Name:
-    
+
     ihiToUpper
 
 Routine Description:
-    
+
     Converts a character to uppercase. It is implemented to
     remove warnings generated due to use of int in toupper.
 
@@ -87,11 +87,11 @@ ihiToUpper(char c)
 /*++
 
 Routine Name:
-    
+
     C_PATCH_MANAGER
 
 Routine Description:
-    
+
     Constructs a Patch manager object
 
 Return:
@@ -117,11 +117,11 @@ C_PATCH_MANAGER::C_PATCH_MANAGER()
 /*++
 
 Routine Name:
-    
+
     ~C_PATCH_MANAGER
 
 Routine Description:
-    
+
     Destroys a Patch manager object
 
 Return:
@@ -135,7 +135,7 @@ C_PATCH_MANAGER::~C_PATCH_MANAGER()
     mPatchedApiListHead = NULL;
     mPatchedApiListTail = NULL;
     mPatchedApiCount    = 0;
-    
+
     // Reset the patched module count
     mPatchedModuleCount = 0;
 
@@ -148,11 +148,11 @@ C_PATCH_MANAGER::~C_PATCH_MANAGER()
 /*++
 
 Routine Name:
-    
+
     Lock
 
 Routine Description:
-    
+
     Lock the patch manager object for write access
 
 Return:
@@ -170,11 +170,11 @@ C_PATCH_MANAGER::Lock()
 /*++
 
 Routine Name:
-    
+
     UnLock
 
 Routine Description:
-    
+
     UnLock the patch manager object once write operations
     are done
 
@@ -193,11 +193,11 @@ C_PATCH_MANAGER::UnLock()
 /*++
 
 Routine Name:
-    
+
     InsertNewPatch
 
 Routine Description:
-    
+
     Allocates memory for code and data for a new patch and add
     it to the global list.
 
@@ -269,7 +269,7 @@ C_PATCH_MANAGER::InsertNewPatch(
 
     patchedApiArray = GetPatchedApiArrayAt(tableIndex);
 
-    ihiInitPatchCode(   
+    ihiInitPatchCode(
             patchedApiArray->mPatchCodeArray[entryIndex],
             mPatchedApiCount);
 
@@ -306,7 +306,7 @@ C_PATCH_MANAGER::GetPatchedApiArrayAt(
 /*++
 
 Routine Description:
-    
+
     Returns the Patched API array at the given index
 
 Return:
@@ -338,7 +338,7 @@ C_PATCH_MANAGER::GetOrigFuncAddrAt(
 /*++
 
 Routine Description:
-    
+
     Returns the address of original function, that
     we patched, at given index
 
@@ -363,11 +363,11 @@ Return:
 /*++
 
 Routine Name:
-    
+
     GetMatchingOrigFuncAddr
 
 Routine Description:
-    
+
     Returns the address of original function corresponding
     to a patch address
 
@@ -403,11 +403,11 @@ C_PATCH_MANAGER::GetMatchingOrigFuncAddr(
 /*++
 
 Routine Name:
-    
+
     GetFuncNameAt
 
 Routine Description:
-    
+
     Returns the name of a patched function at given index
 
 Return:
@@ -437,7 +437,7 @@ C_PATCH_MANAGER::GetReturnDataAt(
 /*++
 
 Routine Description:
-    
+
     Copies the Return Data information about the function at given index
     in the output variable
 
@@ -448,7 +448,7 @@ Return:
 --*/
 {
     //IHU_DBG_ASSERT(inIndex < mPatchedApiCount);
-    
+
     ULONG tableIndex = inIndex / M_HOOK_ENTRY_CHUNK_SIZE;
     ULONG entryIndex = inIndex % M_HOOK_ENTRY_CHUNK_SIZE;
 
@@ -464,9 +464,9 @@ C_PATCH_MANAGER::RemoveAllPatches()
 /*++
 
 Routine Description:
-    
+
     Remove all the patches from the process
-    
+
 NOTE:
     In our earlier design, we were freeing the memory allocated for the patches
     here. This works fine for IAT patched functions, but the functions which we
@@ -513,7 +513,7 @@ Returns:
 
             IHI_API_DATA    *apiInfo    = &patchedApiArray->mApiData[entryIndex];
             PATCH_CODE      *patchCode  = &patchedApiArray->mPatchCodeArray[entryIndex];
-            
+
             patchCode->Prolog.Call[1]   = 0x25;
             patchCode->Prolog.dwAddress = (DWORD)(DWORD_PTR)apiInfo->mOriginalAddress;
         }
@@ -526,11 +526,11 @@ Returns:
 /*++
 
 Routine Name:
-    
+
     IsModulePatched
 
 Routine Description:
-    
+
     Finds whether a given module is already patched or
     not.
 
@@ -562,11 +562,11 @@ C_PATCH_MANAGER::IsModulePatched(
 /*++
 
 Routine Name:
-    
+
     AddModuleToPatchedList
 
 Routine Description:
-    
+
     Add a new module to the list of patched modules
 
 Return:
@@ -591,11 +591,11 @@ C_PATCH_MANAGER::AddModuleToPatchedList(
 /*++
 
 Routine Name:
-    
+
     RemoveModuleFromPatchedList
 
 Routine Description:
-    
+
     Removes a module from the list of patched modules
 
 Return:
@@ -611,7 +611,7 @@ C_PATCH_MANAGER::RemoveModuleFromPatchedList(
     ULONG i = 0;
 
     for (   moduleIndex = 0;
-            moduleIndex < mPatchedModuleCount; 
+            moduleIndex < mPatchedModuleCount;
             ++moduleIndex)
     {
         if (mPatchedModuleList[moduleIndex] == inModuleHandle)
@@ -633,11 +633,11 @@ C_PATCH_MANAGER::RemoveModuleFromPatchedList(
 /*++
 
 Routine Name:
-    
+
     GetPatchedModulesHandle
 
 Routine Description:
-    
+
     Returns the handle of patched module
     at the given index
 
@@ -663,11 +663,11 @@ C_PATCH_MANAGER::GetPatchedModulesHandle(
 /*++
 
 Routine Name:
-    
+
     GetPatchedModulesCount
 
 Routine Description:
-    
+
     Returns the total number of patched modules
 
 Return:
@@ -685,11 +685,11 @@ C_PATCH_MANAGER::GetPatchedModulesCount()
 /*++
 
 Routine Name:
-    
+
     C_PATCH_INCL_EXCL_MGR
 
 Routine Description:
-    
+
     Constructs a Patch Inclusion/Exclusion manager
 
 --*/
@@ -703,11 +703,11 @@ C_PATCH_INCL_EXCL_MGR::C_PATCH_INCL_EXCL_MGR()
 /*++
 
 Routine Name:
-    
+
     ~C_PATCH_INCL_EXCL_MGR
 
 Routine Description:
-    
+
     Destructs a Patch Inclusion/Exclusion manager
 
 --*/
@@ -762,11 +762,11 @@ C_PATCH_INCL_EXCL_MGR::~C_PATCH_INCL_EXCL_MGR()
 /*++
 
 Routine Name:
-    
+
     SetInclExclList
 
 Routine Description:
-    
+
     This function is used to set the inclusion and exclusion
     list of Functions.
 
@@ -797,11 +797,11 @@ C_PATCH_INCL_EXCL_MGR::SetInclExclList(
 /*++
 
 Routine Name:
-    
+
     BuildInclOrExclList
 
 Routine Description:
-    
+
     Parses the inclusion or exclusion list given in the format
     <loaded_module:imp_module:fn_name> and builds the map data
     structure for htat
@@ -896,7 +896,7 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
             PIHI_MAP            *pImpModuleMap  = NULL;
             PIHI_MAP            *pFnNameMap     = NULL;
             IHI_RETURN_DATA     *pReturnData    = NULL;
-            
+
             if (!ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), (LPVOID**)&pImpModuleMap, false))
             {
                 if (!ihiMapAssign(ioMap, (LPCSTR)loadedModule.c_str(), NULL))
@@ -968,12 +968,12 @@ C_PATCH_INCL_EXCL_MGR::PatchRequired(
 /*++
 
 Routine Description:
-    
+
     This routine checks if a function should be patched or not, based on the
     exclusion/inclusion list.
 
 Arguments:
-    
+
     inLoadedModuleName - The module which is calling the function
 
     inImpModuleName - The module which implements the function
@@ -1092,13 +1092,13 @@ C_PATCH_INCL_EXCL_MGR::CalcWeight(
 /*++
 
 Routine Description:
-    
+
     Calculates the weight of a match. We weigh each exact match as 2 and
     each generic match as 1. All the possible combinations are explored to
     find the best match. This is more like a directed graph problem.
 
 Arguments:
-    
+
     inLoadedModuleName - The module which is calling the function
 
     inImpModuleName - The module which implements the function
@@ -1193,7 +1193,7 @@ Return:
                 addlWeight += 2;
 
                 if (ihiMapFind(*pFnNameMap, inFnName, (LPVOID**)&pReturnData, true))
-                {   
+                {
                     addlWeight += 2;
                 }
                 else if (ihiMapFind(*pFnNameMap, genericName, (LPVOID**)&pReturnData, true))
@@ -1259,7 +1259,7 @@ ihiMapFind(
 /*++
 
 Routine Description:
-    
+
     This routine tries to find a value for a given key in a given map. Note
     here that if a key is found, the address of the value is returned and
     not the value itself. We return the address because there are some cases
@@ -1309,7 +1309,7 @@ ihiMapAssign(
 /*++
 
 Routine Description:
-    
+
     This routine creates a new MAP entry and inserts it into the existing
     map supplied in ioMap. We pass the address of the MAP head such that
     when we insert the first item, we modify the head itself to point to it.

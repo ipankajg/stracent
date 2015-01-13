@@ -77,7 +77,7 @@ wmain(int argC, wchar_t *argV[])
 /*++
 
 Routine Description:
-    
+
     strace application's main entry point. It does following
     things:
     - Parse user supplied arguments
@@ -100,14 +100,14 @@ Return:
     wchar_t consoleTitle[MAX_PATH] = {0};
     GetConsoleTitle(consoleTitle, MAX_PATH - 1);
     SetConsoleTitle(APPLICATION_TITLE);
-    gDefaultColor = ChangeTextClr(FOREGROUND_WHITE);    
+    gDefaultColor = ChangeTextClr(FOREGROUND_WHITE);
 
     SetConsoleCtrlHandler(stProcessExit, TRUE);
     stProcessArguments(argC, argV);
 
     ChangeTextClr(gDefaultColor);
     SetConsoleTitle(consoleTitle);
-    
+
 
     return 0;
 }

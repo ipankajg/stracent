@@ -48,7 +48,7 @@ stAboutDlgProc(
 /*++
 
 Routine Description:
-    
+
     dialog box to show information about StraceNT
 
 Returns:
@@ -85,13 +85,13 @@ Returns:
             return (INT_PTR)GetStockObject(BLACK_BRUSH);
         }
         case WM_CTLCOLORSTATIC:
-        {   
+        {
             HDC hdc = (HDC)wParam;
 
             SetBkColor(hdc, RGB(0, 0, 0));
 
             if (GetDlgItem(hDlg, IDC_STATIC_LINK) == (HWND)lParam)
-            {   
+            {
                 SetTextColor(hdc, RGB(128, 128, 192));
             }
             else
@@ -192,7 +192,7 @@ stFillProcessInformation(
             lvItem.mask     = LVIF_TEXT | LVIF_IMAGE;
             lvItem.iImage   = iIndex;
         }
-        
+
         int itemIndex = SendMessage(inListViewHwnd, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
         ListView_SetColumnWidth(inListViewHwnd, 0, LVSCW_AUTOSIZE);
 
@@ -228,7 +228,7 @@ stProcessAttachDlgProc(
 /*++
 
 Routine Description:
-    
+
     Dialog box for user to attach to a process
 
 Returns:
@@ -252,7 +252,7 @@ Returns:
     }
 
     //IHU_DBG_ASSERT(pAttachProcess);
-    
+
     switch(msg)
     {
         case WM_INITDIALOG:
@@ -266,7 +266,7 @@ Returns:
             LVCOLUMN lvColumn;
             lvColumn.mask       = LVCF_TEXT | LVCF_WIDTH;
             lvColumn.cx         = 1;
-            
+
             lvColumn.pszText    = L"Process Name";
             ListView_InsertColumn(
                         GetDlgItem(hDlg, IDC_LIST_PROCESS), 0, &lvColumn);
@@ -279,7 +279,7 @@ Returns:
             ListView_InsertColumn(
                         GetDlgItem(hDlg, IDC_LIST_PROCESS), 2, &lvColumn);
 
-            ListView_SetExtendedListViewStyle(  
+            ListView_SetExtendedListViewStyle(
                                         GetDlgItem(hDlg, IDC_LIST_PROCESS),
                                         LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
 
@@ -382,7 +382,7 @@ Returns:
                         }
                     }
 
-                    int nSelectedItem = 
+                    int nSelectedItem =
                                 ListView_GetSelectionMark(
                                         GetDlgItem(hDlg, IDC_LIST_PROCESS));
 
@@ -437,7 +437,7 @@ stLaunchProcessDlgProc(
 /*++
 
 Routine Description:
-    
+
     Dialog box for user to launch a new process
 
 Returns:
@@ -462,7 +462,7 @@ Returns:
     }
 
     //IHU_DBG_ASSERT(pLaunchProcess);
-    
+
     switch(msg)
     {
         case WM_INITDIALOG:

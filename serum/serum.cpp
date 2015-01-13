@@ -69,17 +69,17 @@ std::string g_MainExeName;
 // Used to maintain the count of number of threads attached
 // to our injector DLL
 //
-LONG gThreadReferenceCount; 
+LONG gThreadReferenceCount;
 
 
 /*++
 
 Routine Name:
-    
+
     IhSerumLoad
 
 Routine Description:
-    
+
     Patch the given modules of the process
     in which this DLL is loaded
 
@@ -145,11 +145,11 @@ IhSerumLoad(
 /*++
 
 Routine Name:
-    
+
     ihiRemovePatching
 
 Routine Description:
-    
+
     Remove all the previously patched
     modules
 
@@ -190,11 +190,11 @@ Routine Description:
 /*++
 
 Routine Name:
-    
+
     DllMain
 
 Routine Description:
-    
+
     Entry point
 
 Return:
@@ -221,17 +221,17 @@ DllMain(
         }
         case DLL_PROCESS_DETACH:
         {
-            //IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"Process detach signalled\n"));           
+            //IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"Process detach signalled\n"));
             IhSerumUnload();
             gThreadReferenceCount = 0;
             break;
         }
         case DLL_THREAD_ATTACH:
-        {   
+        {
             break;
         }
         case DLL_THREAD_DETACH:
-        {   
+        {
             break;
         }
     }
