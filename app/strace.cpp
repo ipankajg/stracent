@@ -51,6 +51,9 @@ Module Description:
 #include "stres.h"
 #include "strace.h"
 
+#define ERR_INJDLL_ERROR_BASE       0x20001000
+#define ERR_PROCESS_NOT_FOUND       (ERR_INJDLL_ERROR_BASE + 1)
+#define ERR_INVALID_PROCESS_ID      (ERR_INJDLL_ERROR_BASE + 2)
 
 //
 // Global array for printing both ascii and unicode strings.
