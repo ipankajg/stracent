@@ -48,7 +48,6 @@ Module Description:
 #include <string>
 #include <fstream>
 #include "ihulib.h"
-#include "injection.h"
 #include "stres.h"
 #include "strace.h"
 
@@ -142,7 +141,7 @@ Routine Description:
     {
         if (ghProcess != INVALID_HANDLE_VALUE)
         {
-            ihiUninjectDll(
+            IhuUninjectDll(
                     ghProcess,
                     (LPCWSTR)gInjectorDllPath.c_str());
         }
@@ -453,7 +452,7 @@ Arguments:
                                     }
                                 }
 
-                                ihiInjectDll(
+                                IhuInjectDll(
                                             ghProcess,
                                             (LPCWSTR)gInjectorDllPath.c_str(),
                                             (LPCSTR)fnIncludes.c_str(),
@@ -815,7 +814,7 @@ Routine Description:
         {
             gView->PrintMessage(L"Tracing command: [%s]\n", userParam.c_str());
 
-            processId = ihiLaunchNewProcess(
+            processId = IhuLaunchNewProcess(
                                         (LPCWSTR)userParam.c_str());
 
             // This is a new process, so set activeProcess = false
@@ -837,7 +836,7 @@ Routine Description:
         {
             gView->PrintMessage(L"Tracing process: [%s]\n", userParam.c_str());
 
-            processId = ihiGetProcessIdByName(
+            processId = IhuGetProcessIdByName(
                                         (LPCWSTR)userParam.c_str());
         }
 
