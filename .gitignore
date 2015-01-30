@@ -1,0 +1,76 @@
+##
+## Master ignore file to be used in most projects.
+##
+## TODO: Right now mostly geared towards VisualStudio. Enhance to incorporate
+##       other compilers in future.
+##
+
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+[Rr]eleases/
+[Bb]in/
+[Oo]bj/
+[Bb]ld/
+
+
+# IDE generated files.
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+ipch/
+*.aps
+*.ncb
+*.opensdf
+*.sdf
+*.cachefile
+*.psess
+*.vsp
+*.vspx
+
+
+# Compiler generated files.
+dlldata.c
+*_i.c
+*_p.c
+*_i.h
+*.ilk
+*.meta
+*.obj
+*.pch
+*.pdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*.log
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+*.swp
+
+# Windows Store app package directory
+AppPackages/
+
+# Microsoft Fakes
+FakesAssemblies/
+
+# VIM Temporary Files
+*.swp
+*.swo
+*.swn
+*.un~
+
+# Thumbnail cache
+Thumbs.db
+
