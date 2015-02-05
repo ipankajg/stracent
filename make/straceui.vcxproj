@@ -64,14 +64,14 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\extrn\ihulib\bin\$(Platform)\$(Configuration)</LibraryPath>
-    <OutDir>$(SolutionDir)bld\bin\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)..\bld\bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\extrn\ihulib\bin\$(Platform)\$(Configuration)</LibraryPath>
-    <OutDir>$(SolutionDir)bld\bin\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)..\bld\bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -91,6 +91,9 @@
     <ResourceCompile>
       <AdditionalIncludeDirectories>$(SolutionDir)..\src\inc;$(OutDir);$(SolutionDir)..\src\app;</AdditionalIncludeDirectories>
     </ResourceCompile>
+    <PostBuildEvent>
+      <Command>xcopy /EY $(TargetPath) $(SolutionDir)..\bld\final\</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -114,6 +117,9 @@
     <ResourceCompile>
       <AdditionalIncludeDirectories>$(SolutionDir)..\src\inc;$(OutDir);$(SolutionDir)..\src\app;</AdditionalIncludeDirectories>
     </ResourceCompile>
+    <PostBuildEvent>
+      <Command>xcopy /EY $(TargetPath) $(SolutionDir)..\bld\final\</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

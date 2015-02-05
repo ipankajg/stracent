@@ -56,13 +56,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\..\ihulib\bld\bin\$(Platform)\$(Configuration)</LibraryPath>
-    <OutDir>$(SolutionDir)bld\bin\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)..\bld\bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\..\ihulib\bld\bin\$(Platform)\$(Configuration)</LibraryPath>
-    <OutDir>$(SolutionDir)bld\bin\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)..\bld\bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

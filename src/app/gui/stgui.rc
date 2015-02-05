@@ -115,7 +115,7 @@ BEGIN
     CONTROL         1107,IDC_STATIC,"Static",SS_BITMAP | 
                     SS_REALSIZEIMAGE,6,10,68,64, WS_EX_TRANSPARENT
     LTEXT           "StraceNT - System Call Tracer",IDC_STATIC,74,14,114,8
-    LTEXT           "Version 0.9 (RC)",IDC_STATIC,74,27,114,8
+    LTEXT           "Version 0.9.2",IDC_STATIC,74,27,114,8
     LTEXT           "Copyright (c) : Pankaj Garg",IDC_STATIC,74,40,88,8
     LTEXT           "http://www.intellectualheaven.com",IDC_STATIC_LINK,74,53,114,8,SS_NOTIFY
     CONTROL         1108,IDOK,"Static",SS_BITMAP | SS_NOTIFY | SS_REALSIZEIMAGE,
