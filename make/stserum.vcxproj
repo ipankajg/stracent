@@ -10,6 +10,22 @@
       <Platform>Win32</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\serum\patchIAT.cpp" />
+    <ClCompile Include="..\src\serum\patchutl.cpp" />
+    <ClCompile Include="..\src\serum\serum.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\serum\patchIAT.h" />
+    <ClInclude Include="..\src\serum\patchutl.h" />
+    <ClInclude Include="..\src\serum\serum.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\src\serum\stserum.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\src\serum\stserum.rc" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{D48A7EAF-8C12-4C53-90D0-9A228D9E113E}</ProjectGuid>
     <RootNamespace>stserum</RootNamespace>
@@ -52,18 +68,18 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(SolutionDir)inc;$(SolutionDir)..\ihulib\inc;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\src\inc;$(SolutionDir)..\extrn\ihulib\bin;</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_WINDLL;%(PreprocessorDefinitions)_CRT_SECURE_NO_WARNINGS;_CRT_NON_CONFORMING_SWPRINTFS;</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);psapi.lib;ihulib.lib;</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
-      <ModuleDefinitionFile>stserum.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>$(SolutionDir)..\src\serum\stserum.def</ModuleDefinitionFile>
       <SubSystem>Console</SubSystem>
     </Link>
     <ResourceCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir)inc;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\src\inc;</AdditionalIncludeDirectories>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -72,7 +88,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(SolutionDir)inc;$(SolutionDir)..\ihulib\inc;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\src\inc;$(SolutionDir)..\extrn\ihulib\bin;</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_WINDLL;%(PreprocessorDefinitions)_CRT_SECURE_NO_WARNINGS;_CRT_NON_CONFORMING_SWPRINTFS;</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -81,29 +97,13 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);psapi.lib;ihulib.lib;</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
-      <ModuleDefinitionFile>stserum.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>$(SolutionDir)..\src\serum\stserum.def</ModuleDefinitionFile>
       <SubSystem>Console</SubSystem>
     </Link>
     <ResourceCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir)inc;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\src\inc;</AdditionalIncludeDirectories>
     </ResourceCompile>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ResourceCompile Include="stserum.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="patchIAT.cpp" />
-    <ClCompile Include="patchutl.cpp" />
-    <ClCompile Include="serum.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="patchIAT.h" />
-    <ClInclude Include="patchutl.h" />
-    <ClInclude Include="serum.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="stserum.def" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

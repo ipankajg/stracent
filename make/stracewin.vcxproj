@@ -10,10 +10,32 @@
       <Platform>Win32</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\app\gui\stcommon.cpp" />
+    <ClCompile Include="..\src\app\gui\stgui.cpp" />
+    <ClCompile Include="..\src\app\gui\stguiview.cpp" />
+    <ClCompile Include="..\src\app\gui\stmiscdlgs.cpp" />
+    <ClCompile Include="..\src\app\gui\stoptionsdlg.cpp" />
+    <ClCompile Include="..\src\app\strace.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\app\gui\stcommon.h" />
+    <ClInclude Include="..\src\app\gui\stgui.h" />
+    <ClInclude Include="..\src\app\gui\stguires.h" />
+    <ClInclude Include="..\src\app\gui\stguiview.h" />
+    <ClInclude Include="..\src\app\gui\stmiscdlgs.h" />
+    <ClInclude Include="..\src\app\gui\stoptionsdlg.h" />
+    <ClInclude Include="..\src\app\strace.h" />
+    <ClInclude Include="..\src\app\stres.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\src\app\gui\stgui.rc" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{FE15209A-9026-4B4C-9D52-83EC133EECA3}</ProjectGuid>
+    <ProjectGuid>{B95CC236-749A-4152-9C50-3246B72B010D}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>StraceNt</RootNamespace>
+    <RootNamespace>StraceNtUi</RootNamespace>
+    <ProjectName>stracewin</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -41,13 +63,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\..\..\ihulib\bld\bin\$(Platform)\$(Configuration)</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\extrn\ihulib\bin\$(Platform)\$(Configuration)</LibraryPath>
     <OutDir>$(SolutionDir)bld\bin\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\..\..\ihulib\bld\bin\$(Platform)\$(Configuration)</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\extrn\ihulib\bin\$(Platform)\$(Configuration)</LibraryPath>
     <OutDir>$(SolutionDir)bld\bin\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
@@ -57,17 +79,17 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_CRT_NON_CONFORMING_SWPRINTFS;</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)app;$(SolutionDir)inc;$(SolutionDir)..\ihulib\inc;</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_CRT_NON_CONFORMING_SWPRINTFS;</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\src\app;$(SolutionDir)..\src\inc;$(SolutionDir)..\extrn\ihulib\bin;</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);psapi.lib;ihulib.lib;</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);psapi.lib;ihulib.lib;comctl32.lib;</AdditionalDependencies>
     </Link>
     <ResourceCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir)inc;$(OutDir);$(SolutionDir)app;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\src\inc;$(OutDir);$(SolutionDir)..\src\app;</AdditionalIncludeDirectories>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -78,35 +100,21 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_CRT_NON_CONFORMING_SWPRINTFS;</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)app;$(SolutionDir)inc;$(SolutionDir)..\ihulib\inc;</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_CRT_NON_CONFORMING_SWPRINTFS;</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\src\app;$(SolutionDir)..\src\inc;$(SolutionDir)..\extrn\ihulib\bin;</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(OutDir)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);psapi.lib;ihulib.lib;</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);psapi.lib;ihulib.lib;comctl32.lib;</AdditionalDependencies>
     </Link>
     <ResourceCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir)inc;$(OutDir);$(SolutionDir)app;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\src\inc;$(OutDir);$(SolutionDir)..\src\app;</AdditionalIncludeDirectories>
     </ResourceCompile>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\inc\stver.h" />
-    <ClInclude Include="..\strace.h" />
-    <ClInclude Include="..\stres.h" />
-    <ClInclude Include="stcliview.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\strace.cpp" />
-    <ClCompile Include="stcli.cpp" />
-    <ClCompile Include="stcliview.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="stcli.rc" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
