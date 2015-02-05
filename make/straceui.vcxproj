@@ -35,7 +35,7 @@
     <ProjectGuid>{B95CC236-749A-4152-9C50-3246B72B010D}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>StraceNtUi</RootNamespace>
-    <ProjectName>stracewin</ProjectName>
+    <ProjectName>straceui</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
