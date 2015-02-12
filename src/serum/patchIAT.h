@@ -42,6 +42,8 @@ Module Description:
 #ifndef _PATCHIAT_H_
 #define _PATCHIAT_H_
 
+#include "serum.h"
+
 using namespace std;
 
 //
@@ -91,6 +93,7 @@ ihiPatchedFuncEntry(
 
 void
 ihiPatchUnpatchImports(
+    HANDLE     inModuleHandle,
     LPCSTR      inModuleBaseName,
     BYTE    *inModuleBaseAddress,
     bool            inApplyHook);

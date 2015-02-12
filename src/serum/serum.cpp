@@ -102,6 +102,11 @@ IhSerumLoad(
     LPCSTR      inFnIncludes,
     LPCSTR      inFnExcludes)
 {
+    //
+    // Pass this log level to serum from StraceNT via some command line.
+    //
+    IhuSetDbgLogLevel(IHU_LEVEL_INFO);
+
     char szModuleName[MAX_PATH] = {0};
 
     if (GetModuleBaseNameA(
@@ -132,7 +137,7 @@ IhSerumLoad(
                             inFnIncludes,
                             inFnExcludes);
 
-    //IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"ihiInitiatePatching called.\n"));
+    IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_LOUD, L"ihiInitiatePatching called.\n");
 
     // Initiate the patching process
     ihiPatchUnpatchModules(g_hInstance, true);
@@ -216,12 +221,12 @@ DllMain(
     {
         case DLL_PROCESS_ATTACH:
         {
-            //IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"Process attach signalled\n"));
+            IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_FLOOD, L"Process attach signalled\n");
             break;
         }
         case DLL_PROCESS_DETACH:
         {
-            //IHU_DBG_LOG(TRC_INJECTOR, IHU_LEVEL_INFO, (L"Process detach signalled\n"));
+            IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_FLOOD, L"Process detach signalled\n");
             IhSerumUnload();
             gThreadReferenceCount = 0;
             break;

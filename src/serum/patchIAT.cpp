@@ -76,6 +76,43 @@ extern HINSTANCE g_hInstance;
 extern LONG gThreadReferenceCount;
 
 
+typedef enum _PROCESSINFOCLASS {
+    ProcessBasicInformation,
+    ProcessQuotaLimits,
+    ProcessIoCounters,
+    ProcessVmCounters,
+    ProcessTimes,
+    ProcessBasePriority,
+    ProcessRaisePriority,
+    ProcessDebugPort,
+    ProcessExceptionPort,
+    ProcessAccessToken,
+    ProcessLdtInformation,
+    ProcessLdtSize,
+    ProcessDefaultHardErrorMode,
+    ProcessIoPortHandlers,
+    ProcessPooledUsageAndLimits,
+    ProcessWorkingSetWatch,
+    ProcessUserModeIOPL,
+    ProcessEnableAlignmentFaultFixup,
+    ProcessPriorityClass,
+    ProcessWx86Information,
+    ProcessHandleCount,
+    ProcessAffinityMask,
+    ProcessPriorityBoost,
+    ProcessDeviceMap,
+    ProcessSessionInformation,
+    ProcessForegroundInformation,
+    ProcessWow64Information,
+    ProcessImageFileName,
+    ProcessLUIDDeviceMapsEnabled,
+    ProcessBreakOnTermination,
+    ProcessDebugObjectHandle,
+    ProcessDebugFlags,
+    ProcessHandleTracing,
+    MaxProcessInfoClass
+} PROCESSINFOCLASS;
+
 /*++
 
 Routine Name:
@@ -423,16 +460,40 @@ ihiPatchedFuncEntry(
     //
     OutputDebugStringA(szStr);
 
-    if (strcmp(funcName, "IsDebuggerPresent") == 0)
+    if (_stricmp(funcName, "IsDebuggerPresent") == 0)
     {
-        //
-        // Make the program being traced think as if no debugger
-        // is present. This is necessary because to trace a
-        // program we attach to it like a debugger. Some
-        // programs which have anti debugger implementation
-        // fails if they think a debugger is attached
-        //
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+                       L"AntiDebug: Modifying IsDebuggerPresent return from: %x -> 0\n",
+                       valueReturn);
         valueReturn = 0;
+    }
+    else if (_stricmp(funcName, "CheckRemoteDebuggerPresent") == 0)
+    {
+        PBOOL pbDebuggerPresent = (PBOOL)(*(pFirstParam + 1));
+        if (pbDebuggerPresent != NULL)
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+                           L"AntiDebug: Modifying DebuggerPresent from: %x -> 0\n",
+                           *pbDebuggerPresent);
+
+            *pbDebuggerPresent = FALSE;
+        }
+    }
+    else if (_stricmp(funcName, "NtQueryInformationProcess") == 0 ||
+             _stricmp(funcName, "ZwQueryInformationProcess") == 0)
+    {
+        PROCESSINFOCLASS processInformationClass = (PROCESSINFOCLASS)(*(pFirstParam + 1));
+        LPDWORD debugPort = (LPDWORD)(*(pFirstParam + 2));
+
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FATAL, L"PROCESSINFOCLASS: %x\n", processInformationClass);
+        if (processInformationClass == ProcessDebugPort)
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+                L"AntiDebug: Modifying DebugPort from: %x -> 0\n",
+                *debugPort);
+
+            *debugPort = 0;
+        }
     }
     else if (   valueReturn != NULL &&
                 (strstr(funcName, "LoadLibrary") == funcName))
@@ -461,7 +522,7 @@ ihiPatchedFuncEntry(
         ihiRemoveUnloadedModules();
     }
     else if (   valueReturn != NULL &&
-                strcmp(funcName, "GetProcAddress") == 0 && 0)
+                strcmp(funcName, "GetProcAddress") == 0)
     //
     // For now patching of functions found via GetProcAddress is disabled by
     // adding && 0. This is done because if we patch the functions returned
@@ -497,11 +558,12 @@ ihiPatchedFuncEntry(
             }
 
             IHI_RETURN_DATA returnData = {0};
-            if (gPatchInclExclMgr.PatchRequired("*", szModuleName, fnName, exportedByOrdinal, &returnData))
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FATAL, L"IsPatchRequired for: %S\n", fnName);
+            if (gPatchInclExclMgr.PatchRequired("", szModuleName, fnName, exportedByOrdinal, &returnData))
             {
                 gPatchManager.Lock();
 
-                //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_INFO, (L"Inserting hook for %x = %S\n", *(pFirstParam+1), fnName));
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Inserting hook for %S:%S\n", szModuleName, fnName);
 
                 LPVOID pfnNew = gPatchManager.InsertNewPatch(fnName, valueReturn, returnData);
 
@@ -512,6 +574,14 @@ ihiPatchedFuncEntry(
 
                 gPatchManager.UnLock();
             }
+            else
+            {
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FATAL, L"Patch NOT required for: %S\n", fnName);
+            }
+        }
+        else
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FATAL, L"GetModuleBaseNameA() Failed.\n");
         }
     }
 
@@ -567,6 +637,163 @@ ihiPatchedFuncEntry(
 #pragma optimize("g", on)
 #pragma check_stack(on)
 
+PIMAGE_SECTION_HEADER GetEnclosingSectionHeader(DWORD rva,
+    PIMAGE_NT_HEADERS pNTHeader)
+{
+    PIMAGE_SECTION_HEADER section = IMAGE_FIRST_SECTION(pNTHeader);
+    unsigned i;
+
+    for (i = 0; i < pNTHeader->FileHeader.NumberOfSections; i++, section++)
+    {
+        // Is the RVA within this section?
+        if ((rva >= section->VirtualAddress) &&
+            (rva < (section->VirtualAddress + section->Misc.VirtualSize)))
+            return section;
+    }
+
+    return 0;
+}
+
+LPVOID GetPtrFromRVA(DWORD rva, PIMAGE_NT_HEADERS pNTHeader, DWORD imageBase)
+{
+    PIMAGE_SECTION_HEADER pSectionHdr;
+    INT delta;
+
+    pSectionHdr = GetEnclosingSectionHeader(rva, pNTHeader);
+    if (!pSectionHdr)
+        return 0;
+
+    delta = (INT)(pSectionHdr->VirtualAddress - pSectionHdr->PointerToRawData);
+    return (PVOID)(imageBase + rva - delta);
+}
+
+
+
+BOOL ihiGetFileImportDescriptor(LPSTR filename, PIMAGE_NT_HEADERS *INTHPtr, PIMAGE_IMPORT_DESCRIPTOR *IIDPtr, PBYTE *BaseAddress)
+{
+    HANDLE hFile;
+    HANDLE hFileMapping;
+    LPBYTE lpFileBase;
+    PIMAGE_DOS_HEADER pIDH;
+    PIMAGE_NT_HEADERS pINTH = NULL;
+    PIMAGE_IMPORT_DESCRIPTOR pIID = NULL;
+    DWORD dwImportTableOffset;
+    BOOL result;
+
+    result = FALSE;
+
+    hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
+        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Couldn't open file with CreateFile()\n");
+        goto Exit;
+    }
+
+    hFileMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+    if (hFileMapping == 0)
+    {
+        CloseHandle(hFile);
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Couldn't open file mapping with CreateFileMapping()\n");
+        goto Exit;
+    }
+
+    lpFileBase = (LPBYTE)MapViewOfFile(hFileMapping, FILE_MAP_READ, 0, 0, 0);
+    if (lpFileBase == 0)
+    {
+        CloseHandle(hFileMapping);
+        CloseHandle(hFile);
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Couldn't map view of file with MapViewOfFile()\n");
+        goto Exit;
+    }
+
+    pIDH = (PIMAGE_DOS_HEADER)lpFileBase;
+    if (pIDH->e_magic == IMAGE_DOS_SIGNATURE)
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Module for file %S is PE format.\n", filename);
+        pINTH = (PIMAGE_NT_HEADERS)(lpFileBase + pIDH->e_lfanew);
+        dwImportTableOffset = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+        if (dwImportTableOffset == 0)
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+                L"PatchFailure: No Import Table Offset for module: %S.\n",
+                filename);
+            goto Exit;
+        }
+        // pIID = (PIMAGE_IMPORT_DESCRIPTOR)(lpFileBase + dwImportTableOffset);
+        pIID = (PIMAGE_IMPORT_DESCRIPTOR)GetPtrFromRVA(dwImportTableOffset, pINTH, (DWORD)lpFileBase);
+#if 0
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Here3. %d\n", pIID->OriginalFirstThunk);
+        if (pIID->OriginalFirstThunk != 0)
+        {
+            // pIINA = (PIMAGE_THUNK_DATA)(lpFileBase + (DWORD)pIID->OriginalFirstThunk);
+            // Adjust the pointer to point where the tables are in the
+            // mem mapped file.
+            pIINA = (PIMAGE_THUNK_DATA)GetPtrFromRVA((DWORD)pIID->OriginalFirstThunk, pINTH, lpFileBase);
+        }
+#endif
+    }
+    else
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"unrecognized file format\n");
+        goto Exit;
+    }
+
+    result = TRUE;
+    goto Exit;
+
+    UnmapViewOfFile(lpFileBase);
+    CloseHandle(hFileMapping);
+    CloseHandle(hFile);
+
+Exit:
+    *INTHPtr = pINTH;
+    *IIDPtr = pIID;
+    *BaseAddress = lpFileBase;
+    return result;
+}
+
+
+BOOL
+ihiGetModuleImportDescriptor(PBYTE inModuleBaseAddress, LPCSTR inModuleBaseName, PIMAGE_NT_HEADERS *INTHPtr, PIMAGE_IMPORT_DESCRIPTOR *IIDPtr)
+{
+    PIMAGE_DOS_HEADER           pIDH;
+    PIMAGE_NT_HEADERS           pINTH;
+    PIMAGE_IMPORT_DESCRIPTOR    pIID;
+    DWORD                       dwImportTableOffset;
+    BOOL result;
+
+    pINTH = NULL;
+    pIID = NULL;
+    result = FALSE;
+
+    pIDH = (PIMAGE_DOS_HEADER)inModuleBaseAddress;
+    if (IsBadReadPtr(inModuleBaseAddress, sizeof(IMAGE_DOS_HEADER)))
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+            L"PatchFailure: Unable to read IMAGE_DOS_HEADER for module: %S.\n",
+            inModuleBaseName);
+        goto Exit;
+    }
+    pINTH = (PIMAGE_NT_HEADERS)(inModuleBaseAddress + pIDH->e_lfanew);
+    dwImportTableOffset = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+    if (dwImportTableOffset == 0)
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+            L"PatchFailure: No Import Table Offset for module: %S.\n",
+            inModuleBaseName);
+        goto Exit;
+    }
+    pIID = (PIMAGE_IMPORT_DESCRIPTOR)(inModuleBaseAddress + dwImportTableOffset);
+    result = TRUE;
+
+Exit:
+
+    *INTHPtr = pINTH;
+    *IIDPtr = pIID;
+    return result;
+}
 
 /*++
 
@@ -593,36 +820,45 @@ Return:
 --*/
 void
 ihiPatchUnpatchImports(
+    HANDLE     inModuleHandle,
     LPCSTR      inModuleBaseName,
     BYTE    *inModuleBaseAddress,
     bool            inApplyHook)
 {
-    PIMAGE_DOS_HEADER           pIDH                = (PIMAGE_DOS_HEADER) inModuleBaseAddress;
     PIMAGE_NT_HEADERS           pINTH;
     PIMAGE_IMPORT_DESCRIPTOR    pIID;
+    PIMAGE_NT_HEADERS           pINTH_File;
+    PIMAGE_IMPORT_DESCRIPTOR    pIID_File;
+    PBYTE                       moduleBaseAddress;
+    PBYTE                       moduleBaseAddress_File;
     DWORD                       dwTemp;
-    DWORD                       dwImportTableOffset;
     DWORD                       dwOldProtect;
+    LPSTR                       pszModule;
+    PIMAGE_THUNK_DATA           pITDA;
+    PIMAGE_THUNK_DATA           pIINA;
+    BOOL useFileIID;
+    BOOL fileIIDAvailable;
+    wchar_t pwszModule[MAX_PATH];
 
-    if (IsBadReadPtr(inModuleBaseAddress, sizeof(IMAGE_DOS_HEADER)))
+    useFileIID = FALSE;
+    fileIIDAvailable = FALSE;
+    pIID_File = NULL;
+    moduleBaseAddress = inModuleBaseAddress;
+
+    if (!ihiGetModuleImportDescriptor(moduleBaseAddress, inModuleBaseName, &pINTH, &pIID))
     {
         return;
     }
-
-    //
-    // Get the import table by traversing IMAGE_NT_HEADERS
-    //
-    pINTH = (PIMAGE_NT_HEADERS)(inModuleBaseAddress + pIDH->e_lfanew);
-
-    dwImportTableOffset = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-
-    if (dwImportTableOffset == 0)
+    
+    if (GetModuleHandle(NULL) == inModuleHandle)
     {
-        // No import table
-        return;
+        if (ihiGetFileImportDescriptor(
+                "C:\\Users\\ipankajg\\Source\\github\\stracent\\bld\\final\\xADT2.exe",
+                &pINTH_File, &pIID_File, &moduleBaseAddress_File))
+        {
+            fileIIDAvailable = TRUE;
+        }
     }
-
-    pIID = (PIMAGE_IMPORT_DESCRIPTOR)(inModuleBaseAddress + dwImportTableOffset);
 
     //
     // Loop through the import table and patch all the APIs
@@ -630,37 +866,69 @@ ihiPatchUnpatchImports(
     //
     while (TRUE)
     {
-        LPSTR                   pszModule   = NULL;
-        PIMAGE_THUNK_DATA       pITDA       = NULL;
-        PIMAGE_THUNK_DATA       pIINA       = NULL;
-        wchar_t pwszModule[MAX_PATH];
-
+        pszModule   = NULL;
+        pITDA       = NULL;
+        pIINA       = NULL;
 
         //
-        // return if no first thunk or no orginalFirstThunk
+        // Return if no first thunk - This is termination condition of the loop.
         //
-        if (pIID->FirstThunk == 0 || pIID->OriginalFirstThunk == 0)
+        if (pIID->FirstThunk == 0)
         {
-            // Loop exit condition
             break;
         }
 
         //
         // DLL name from which functions are imported
         //
-        pszModule = (LPSTR)(inModuleBaseAddress + pIID->Name);
+        pszModule = (LPSTR)(moduleBaseAddress + pIID->Name);
         swprintf(pwszModule, L"%S", pszModule);
+
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+            L"Patching: Import from DLL: %s.\n",
+            pwszModule);
 
         //
         // First thunk points to IMAGE_THUNK_DATA
         //
-        pITDA = (PIMAGE_THUNK_DATA)(inModuleBaseAddress + (DWORD)pIID->FirstThunk);
+        pITDA = (PIMAGE_THUNK_DATA)(moduleBaseAddress + (DWORD)pIID->FirstThunk);
 
-        //
-        // OriginalFirstThunk points to IMAGE_IMPORT_BY_NAME array. But still we
-        // use IMAGE_THUNK_DATA structure to reference it for ease of programming
-        //
-        pIINA = (PIMAGE_THUNK_DATA)(inModuleBaseAddress + (DWORD)pIID->OriginalFirstThunk);
+        if (pIID->OriginalFirstThunk == 0)
+        {
+            if (fileIIDAvailable && pIID_File->FirstThunk != 0)
+            {
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+                    L"Module OriginalFirstThunk is Zero, trying to use this information from module binary on disk.\n");
+                useFileIID = TRUE;
+            }
+            else
+            {
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+                    L"Module OriginalFirstThunk is Zero and module's binary on disk is not available.\n");
+                break;
+            }
+
+            pIINA = (PIMAGE_THUNK_DATA)GetPtrFromRVA(pIID_File->FirstThunk, pINTH_File, (DWORD)moduleBaseAddress_File);
+            if (pIINA == NULL)
+            {
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+                    L"Module's binary on disk does not have FirstThunk information either, skipping this module's patching.\n");
+                break;
+            }
+        }
+        else
+        {
+            //
+            // Loaded module has name array for functions intact, no need to use IID from file.
+            //
+            useFileIID = FALSE;
+
+            //
+            // OriginalFirstThunk points to IMAGE_IMPORT_BY_NAME array. But still we
+            // use IMAGE_THUNK_DATA structure to reference it for ease of programming
+            //
+            pIINA = (PIMAGE_THUNK_DATA)(moduleBaseAddress + (DWORD)pIID->OriginalFirstThunk);
+        }
 
         while (pITDA->u1.Ordinal != 0)
         {
@@ -672,16 +940,23 @@ ihiPatchUnpatchImports(
                 pfnOld = (PVOID)pITDA->u1.Function;
 
                 // This is used to find out the name of API
-                if (pIINA)
+                if (pIINA != NULL)
                 {
                     LPSTR fnName = NULL;
                     char ordString[32];
                     bool exportedByOrdinal = false;
-
                     if (!IMAGE_SNAP_BY_ORDINAL(pIINA->u1.Ordinal))
                     {
                         // Exported by name
-                        PIMAGE_IMPORT_BY_NAME pIIN = (PIMAGE_IMPORT_BY_NAME)(inModuleBaseAddress + pIINA->u1.AddressOfData);
+                        PIMAGE_IMPORT_BY_NAME pIIN;
+                        if (!useFileIID)
+                        {
+                            pIIN = (PIMAGE_IMPORT_BY_NAME)(moduleBaseAddress + pIINA->u1.AddressOfData);
+                        }
+                        else
+                        {
+                            pIIN = (PIMAGE_IMPORT_BY_NAME)GetPtrFromRVA((DWORD)pIINA->u1.AddressOfData, pINTH_File, (DWORD)moduleBaseAddress_File);
+                        }
                         fnName = (LPSTR)pIIN->Name;
                     }
                     else
@@ -705,7 +980,7 @@ ihiPatchUnpatchImports(
                     IHI_RETURN_DATA returnData = {0};
                     if (gPatchInclExclMgr.PatchRequired(inModuleBaseName, pszModule, fnName, exportedByOrdinal, &returnData))
                     {
-                        //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_LOUD, (L"Thunking -> %S of %s.\n", fnName, pwszModule));
+                        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD, L"Thunking -> %S of %s.\n", fnName, pwszModule);
 
                         // Make the page writable and replace the original function address
                         // with our hook function address
@@ -715,7 +990,7 @@ ihiPatchUnpatchImports(
 
                             if (pfnNew)
                             {
-                                //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_LOUD, (L"Thunking -> %S from 0x%08X to 0x%08X.\n", fnName, pfnOld, pfnNew));
+                                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Thunking -> %s:%S from 0x%08X to 0x%08X.\n", pwszModule, fnName, pfnOld, pfnNew);
                                 pITDA->u1.Function = (DWORD)pfnNew;
                             }
 
@@ -751,6 +1026,10 @@ ihiPatchUnpatchImports(
 
         // Next module in Import table
         pIID++;
+        if (fileIIDAvailable)
+        {
+            pIID_File++;
+        }
     }
 }
 
@@ -787,9 +1066,7 @@ debug:
     _asm je debug;
     _asm pop eax;
 
-    //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_INFO, (L"------------\n"));
-    //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_INFO, (L"Patching/Unpatching modules\n"));
-    //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_INFO, (L"------------\n"));
+    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD, L"**** Patching/Unpatching modules ****\n");
 
     //
     // TODO
@@ -835,12 +1112,12 @@ debug:
 
             if (inApplyHook)
             {
-                if (gPatchManager.IsModulePatched(
-                        moduleInfo.mModuleHandle) == false)
+                if (gPatchManager.IsModulePatched(moduleInfo.mModuleHandle) == false)
                 {
-                    //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_INFO, (L"Patching: %S\n", szModuleName));
+                    IHU_DBG_LOG_EX(IHU_LOGGING_ON, IHU_LEVEL_INFO, L"Patching: %S\n", szModuleName);
 
                     ihiPatchUnpatchImports(
+                        moduleInfo.mModuleHandle,
                         szModuleName,
                         (BYTE *)moduleInfo.mModuleBaseAddress,
                         true);
@@ -857,6 +1134,7 @@ debug:
                     // Unpatch the imports.
                     //
                     ihiPatchUnpatchImports(
+                        moduleInfo.mModuleHandle,
                         szModuleName,
                         (BYTE *)moduleInfo.mModuleBaseAddress,
                         false);
@@ -872,7 +1150,7 @@ debug:
     //
     if (inApplyHook == false)
     {
-        //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_INFO, (L"Remaining patched modules: %d\n", gPatchManager.GetPatchedModulesCount()));
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD, L"Remaining patched modules: %d\n", gPatchManager.GetPatchedModulesCount());
         gPatchManager.RemoveAllPatches();
     }
 
@@ -902,9 +1180,7 @@ void
 WINAPI
 ihiRemoveUnloadedModules()
 {
-    //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_INFO, (L"------------\n"));
-    //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_INFO, (L"Removing unloaded modules\n"));
-    //IHU_DBG_LOG(TRC_PATCHIAT, IHU_LEVEL_INFO, (L"------------\n"));
+    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"**** Removing unloaded modules ****\n");
 
     IHU_MODULE_LIST moduleList;
     IhuGetModuleList(GetCurrentProcessId(), moduleList);

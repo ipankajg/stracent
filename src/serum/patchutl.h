@@ -85,7 +85,7 @@ typedef struct _IHI_RETURN_DATA
     bool    Specified;
     int     Value;
 
-}IHI_RETURN_DATA;
+} IHI_RETURN_DATA, *PIHI_RETURN_DATA;
 
 
 //
@@ -247,6 +247,7 @@ struct _IHI_MAP;
 typedef struct _IHI_MAP
 {
     char                Key[MAX_PATH];
+    bool                IsPrefix;
     LPVOID              Value;
     struct _IHI_MAP     *Next;
 
@@ -255,9 +256,9 @@ typedef struct _IHI_MAP
 bool
 ihiMapFind(
     IHI_MAP     *inMap,
-    LPCSTR  inKey,
-    LPVOID      **oValue,
-    bool        inCaseSensitive);
+    LPCSTR      inKey,
+    LPVOID      *oValue,
+    bool        inDoPrefixMatch);
 
 
 bool
@@ -300,11 +301,24 @@ public:
 
     int
     CalcWeight(
-        LPCSTR          inLoadedModuleName,
-        LPCSTR          inImpModuleName,
-        LPCSTR          inFnName,
-        IHI_RETURN_DATA     *oRetVal,
-        PIHI_MAP            inLoadedModuleMap);
+        PIHI_MAP            inLoadedModuleMap,
+        LPCSTR              inLoadedModuleName,
+        LPCSTR              inImpModuleName,
+        LPCSTR              inFnName,
+        IHI_RETURN_DATA     *oRetVal);
+
+    int
+    CalcFnMatchWeight(
+        PIHI_MAP inFnMap,
+        LPCSTR inFnName,
+        LPVOID *oReturnData);
+
+    int
+    CalcImpModuleMatchWeight(
+        PIHI_MAP inImpModuleMap,
+        LPCSTR inImpModuleName,
+        LPCSTR inFnName,
+        LPVOID *oReturnData);
 
 private:
     PIHI_MAP        m_IncludeList;

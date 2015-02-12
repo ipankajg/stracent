@@ -44,6 +44,8 @@ Module Description:
 
 #include <windows.h>
 
+#define TRC_PATCHIAT IHU_LOGGING_ON
+#define TRC_INJECTOR IHU_LOGGING_OFF
 
 void
 WINAPI

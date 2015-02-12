@@ -59,7 +59,6 @@ TO_UPPER gToUpper = ihiToUpper;
 //
 extern std::string g_MainExeName;
 
-
 /*++
 
 Routine Name:
@@ -758,6 +757,35 @@ C_PATCH_INCL_EXCL_MGR::~C_PATCH_INCL_EXCL_MGR()
     }
 }
 
+void
+DumpMap(PIHI_MAP inMap, LPCWSTR inTitle)
+{
+    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"**** DUMPING %s MAP ****\n", inTitle);
+    for (IHI_MAP *pCurrent = inMap; pCurrent; pCurrent = pCurrent->Next)
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+            L"Key: %S, Value: %x\n", pCurrent->Key, &pCurrent->Value);
+
+        if (pCurrent->Value != NULL)
+        {
+            for (IHI_MAP *pCurrent2 = (PIHI_MAP)pCurrent->Value; pCurrent2; pCurrent2 = pCurrent2->Next)
+            {
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+                    L"\tKey: %S\n", pCurrent2->Key);
+
+                if (pCurrent2->Value != NULL)
+                {
+                    for (IHI_MAP *pCurrent3 = (PIHI_MAP)pCurrent2->Value; pCurrent3; pCurrent3 = pCurrent3->Next)
+                    {
+                        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+                            L"\t\tKey: %S\n", pCurrent3->Key);
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 /*++
 
@@ -780,17 +808,24 @@ C_PATCH_INCL_EXCL_MGR::SetInclExclList(
     LPCSTR  inFnIncludes,
     LPCSTR  inFnExcludes)
 {
+    //
+    // Hardcoded exclusion for problem causing modules.
+    //
+    std::string fixedExcludes;
+    fixedExcludes = "<msvc*:*:*><*:ntdll.dll:*><*:msvc*:*><*:mfc*:*><*:api-ms-win*:*>";
+    BuildInclOrExclList(fixedExcludes, &m_ExcludeList);
+
+    //
+    // User provided include/exclude.
+    //
     std::string     fnIncList = inFnIncludes;
     std::string     fnExcList = inFnExcludes;
 
-    BuildInclOrExclList(
-                    fnIncList,
-                    &m_IncludeList);
+    BuildInclOrExclList(fnIncList, &m_IncludeList);
+    BuildInclOrExclList(fnExcList, &m_ExcludeList);
 
-    BuildInclOrExclList(
-                    fnExcList,
-                    &m_ExcludeList);
-
+    DumpMap(m_IncludeList, L"INCLUDE");
+    DumpMap(m_ExcludeList, L"EXCLUDE");
 }
 
 
@@ -821,7 +856,7 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
 
     int index_end = 0;
 
-    while(true)
+    while (true)
     {
         index_end = inFnList.find_first_of('>', index_begin);
 
@@ -893,11 +928,36 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
                 }
             }
 
+            if (loadedModule.empty() || impModule.empty() || fnName.empty())
+            {
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+                    L"Ignoring invalid include/exclude list: %S\n",
+                    fnInc.c_str());
+            }
+            
+            if (*loadedModule.rbegin() == '*')
+            {
+                loadedModule.pop_back();
+            }
+
+            if (*impModule.rbegin() == '*')
+            {
+                impModule.pop_back();
+            }
+
+            if (*fnName.rbegin() == '*')
+            {
+                fnName.pop_back();
+            }
+
             PIHI_MAP            *pImpModuleMap  = NULL;
             PIHI_MAP            *pFnNameMap     = NULL;
             IHI_RETURN_DATA     *pReturnData    = NULL;
 
-            if (!ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), (LPVOID**)&pImpModuleMap, false))
+            //
+            // Create loaded module entry if it does not exist.
+            //
+            if (!ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), (LPVOID*)&pImpModuleMap, false))
             {
                 if (!ihiMapAssign(ioMap, (LPCSTR)loadedModule.c_str(), NULL))
                 {
@@ -905,9 +965,12 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
                 }
             }
 
-            ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), (LPVOID**)&pImpModuleMap, false);
+            //
+            // Create import module entry if it does not exist.
+            //
+            ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), (LPVOID*)&pImpModuleMap, false);
 
-            if (!ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), (LPVOID**)&pFnNameMap, false))
+            if (!ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), (LPVOID*)&pFnNameMap, false))
             {
                 if (!ihiMapAssign(pImpModuleMap, (LPCSTR)impModule.c_str(), NULL))
                 {
@@ -915,9 +978,12 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
                 }
             }
 
-            ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), (LPVOID**)&pFnNameMap, false);
+            //
+            // Create function name entry if it does not exist.
+            //
+            ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), (LPVOID*)&pFnNameMap, false);
 
-            if (!ihiMapFind(*pFnNameMap, (LPCSTR)fnName.c_str(), (LPVOID**)&pReturnData, true))
+            if (!ihiMapFind(*pFnNameMap, (LPCSTR)fnName.c_str(), (LPVOID*)&pReturnData, false))
             {
                 pReturnData = NULL;
 
@@ -925,16 +991,13 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
                 {
                     pReturnData = new IHI_RETURN_DATA;
 
-                    if (pReturnData)
+                    if (pReturnData == NULL)
                     {
-                        memset(pReturnData, 0, sizeof(IHI_RETURN_DATA));
-                        *pReturnData = retValInfo;
+                        return;
                     }
 
-                    // Ignore the memory allocation failure because this is
-                    // not cruicial here. If we can't allocate return value
-                    // information, we can store NULL in which case, the
-                    // return value from patched functions won't be changed
+                    memset(pReturnData, 0, sizeof(IHI_RETURN_DATA));
+                    *pReturnData = retValInfo;
                 }
 
                 if (!ihiMapAssign(pFnNameMap, (LPCSTR)fnName.c_str(), pReturnData))
@@ -942,8 +1005,7 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
                     return;
                 }
             }
-
-        }while(false);
+        } while(false);
 
         index_begin = index_end + 2;
     }
@@ -963,7 +1025,7 @@ C_PATCH_INCL_EXCL_MGR::PatchRequired(
     LPCSTR      inLoadedModuleName,
     LPCSTR      inImpModuleName,
     LPCSTR      inFnName,
-    bool            inOrdinalExport,
+    bool        inOrdinalExport,
     IHI_RETURN_DATA *oRetVal)
 /*++
 
@@ -993,88 +1055,47 @@ Return:
 
 --*/
 {
-    //
-    // Hardcoded exclusion for the problem causing modules
-    //
-
-    //
-    // Certain DLLs like MSVCRT and NTDLL causes recursive hooking hence functions
-    // imported from these DLLs are always excluded even if a user wants to hook
-    //
-    if (_strnicmp("MSVC", inImpModuleName, 4) == 0 ||
-        _strnicmp("NTDLL", inImpModuleName, 5) == 0)
-    {
-        return false;
-    }
-
-    //
-    // Ordinal exports from MFC are also always excluded because MFC DLLs export
-    // variables by name too. If we hook an import variable, we eventually end up
-    // supplying a totally wrong data structure to the calling application. This
-    // was causing crash in wordpad
-    //
-    if (_strnicmp("MFC", inImpModuleName, 3) == 0 &&
-        inOrdinalExport)
-    {
-        return false;
-    }
+    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD,
+        L"IsPatchRequired for: %S, %S, %S\n",
+        inLoadedModuleName, inImpModuleName, inFnName);
 
     bool funcResult = false;
     int inclWeight = 0;
     int exclWeight = 0;
 
     inclWeight = CalcWeight(
+                        m_IncludeList,
                         inLoadedModuleName,
                         inImpModuleName,
                         inFnName,
-                        oRetVal,
-                        m_IncludeList);
+                        oRetVal);
 
     exclWeight = CalcWeight(
+                        m_ExcludeList,
                         inLoadedModuleName,
                         inImpModuleName,
                         inFnName,
-                        NULL,
-                        m_ExcludeList);
+                        NULL);
 
-    if (exclWeight > inclWeight)
-    {
-        funcResult = false;
-    }
-    else if (exclWeight < inclWeight)
+    if ((inclWeight == 0 && exclWeight == 0) ||
+        (exclWeight < inclWeight))
     {
         funcResult = true;
     }
     else
     {
-        //
-        // At this point we should see whether included list has higher weight
-        // for LoadedModule or excluded list. If loaded module weight is same
-        // for both included and excluded then we should include the module
-        //
+        funcResult = false;
+    }
 
-        PIHI_MAP            pImpModuleMap;
-
-        int inclWt  = 0;
-        int exclWt  = 0;
-
-        if (ihiMapFind(m_IncludeList, inLoadedModuleName, (LPVOID**)&pImpModuleMap, false))
+    if (funcResult)
+    {
+        if (inFnName != NULL)
         {
-            inclWt = 2;
-        }
-
-        if (ihiMapFind(m_ExcludeList, inLoadedModuleName, (LPVOID**)&pImpModuleMap, false))
-        {
-            exclWt = 2;
-        }
-
-        if (inclWt >= exclWt)
-        {
-            funcResult = true;
-        }
-        else
-        {
-            funcResult = false;
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+                L"Patching Function: %S->%S:%S\n",
+                inLoadedModuleName,
+                inImpModuleName,
+                inFnName);
         }
     }
 
@@ -1083,12 +1104,66 @@ Return:
 
 
 int
+C_PATCH_INCL_EXCL_MGR::CalcFnMatchWeight(
+    PIHI_MAP inFnMap,
+    LPCSTR inFnName,
+    LPVOID *oReturnData)
+{
+    int fnWeight = 0;
+
+    if (ihiMapFind(inFnMap, inFnName, oReturnData, false))
+    {
+        fnWeight = 4;
+    }
+    else if (ihiMapFind(inFnMap, inFnName, oReturnData, true))
+    {
+        fnWeight = 1;
+    }
+
+    return fnWeight;
+}
+
+int
+C_PATCH_INCL_EXCL_MGR::CalcImpModuleMatchWeight(
+    PIHI_MAP inImpModuleMap,
+    LPCSTR inImpModuleName,
+    LPCSTR inFnName,
+    LPVOID *oReturnData)
+{
+    PIHI_MAP *pFnNameMap;
+    int impModuleWeight = 0;
+    int fnWeight = 0;
+
+    if (ihiMapFind(inImpModuleMap, inImpModuleName, (LPVOID*)&pFnNameMap, false))
+    {
+        impModuleWeight = 3;
+        fnWeight = CalcFnMatchWeight(*pFnNameMap, inFnName, oReturnData);
+    }
+
+    if (impModuleWeight == 0 || fnWeight == 0)
+    {
+        if (ihiMapFind(inImpModuleMap, inImpModuleName, (LPVOID*)&pFnNameMap, true))
+        {
+            impModuleWeight = 1;
+            fnWeight = CalcFnMatchWeight(*pFnNameMap, inFnName, oReturnData);
+        }
+    }
+
+    if (impModuleWeight == 0 || fnWeight == 0)
+    {
+        return 0;
+    }
+
+    return impModuleWeight + fnWeight;
+}
+
+int
 C_PATCH_INCL_EXCL_MGR::CalcWeight(
-    LPCSTR          inLoadedModuleName,
-    LPCSTR          inImpModuleName,
-    LPCSTR          inFnName,
-    IHI_RETURN_DATA     *oRetVal,
-    PIHI_MAP            inLoadedModuleMap)
+    PIHI_MAP            inLoadedModuleMap,
+    LPCSTR              inLoadedModuleName,
+    LPCSTR              inImpModuleName,
+    LPCSTR              inFnName,
+    IHI_RETURN_DATA     *oRetVal)
 /*++
 
 Routine Description:
@@ -1116,146 +1191,57 @@ Return:
     int - a number representing the weight of the function
 
 --*/
-{
-    PIHI_MAP            *pImpModuleMap;
-    PIHI_MAP            *pFnNameMap;
-    IHI_RETURN_DATA     **pReturnData;
+{   
+    PIHI_MAP *pImpModuleMap;
+    PIHI_RETURN_DATA *pReturnData;
+    int loadedModuleWeight = 0;
+    int impModuleWeight = 0;
 
-    int calcedWeight = 0;
-
-    char *genericName = "*";
-
-    if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, (LPVOID**)&pImpModuleMap, false))
+    if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, (LPVOID*)&pImpModuleMap, false))
     {
-        calcedWeight += 2;
+        loadedModuleWeight = 2;
+        impModuleWeight = CalcImpModuleMatchWeight(*pImpModuleMap, inImpModuleName, inFnName, (LPVOID*)&pReturnData);
+    }
 
-        int addlWeight = 0;
-
-        if (ihiMapFind(*pImpModuleMap, inImpModuleName, (LPVOID**)&pFnNameMap, false))
+    if (loadedModuleWeight == 0 || impModuleWeight == 0)
+    {
+        if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, (LPVOID*)&pImpModuleMap, true))
         {
-            addlWeight += 2;
-
-            if (ihiMapFind(*pFnNameMap, inFnName, (LPVOID**)&pReturnData, true))
-            {
-                addlWeight += 2;
-            }
-            else if (ihiMapFind(*pFnNameMap, genericName, (LPVOID**)&pReturnData, true))
-            {
-                addlWeight += 1;
-            }
-            else
-            {
-                addlWeight = 0;
-            }
-        }
-
-        if (addlWeight ==  0)
-        {
-            if (ihiMapFind(*pImpModuleMap, genericName, (LPVOID**)&pFnNameMap, false))
-            {
-                addlWeight += 1;
-
-                if (ihiMapFind(*pFnNameMap, inFnName, (LPVOID**)&pReturnData, true))
-                {
-                    addlWeight += 2;
-                }
-                else if (ihiMapFind(*pFnNameMap, genericName, (LPVOID**)&pReturnData, true))
-                {
-                    addlWeight += 1;
-                }
-                else
-                {
-                    addlWeight = 0;
-                }
-            }
-        }
-
-        if (addlWeight == 0)
-        {
-            calcedWeight = 0;
-        }
-        else
-        {
-            calcedWeight += addlWeight;
+            loadedModuleWeight = 1;
+            impModuleWeight = CalcImpModuleMatchWeight(*pImpModuleMap, inImpModuleName, inFnName, (LPVOID*)&pReturnData);
         }
     }
 
-    if (calcedWeight == 0)
+    if (loadedModuleWeight == 0 || impModuleWeight == 0)
     {
-        if (ihiMapFind(inLoadedModuleMap, genericName, (LPVOID**)&pImpModuleMap, false))
-        {
-            calcedWeight += 1;
-
-            int addlWeight = 0;
-
-            if (ihiMapFind(*pImpModuleMap, inImpModuleName, (LPVOID**)&pFnNameMap, false))
-            {
-                addlWeight += 2;
-
-                if (ihiMapFind(*pFnNameMap, inFnName, (LPVOID**)&pReturnData, true))
-                {
-                    addlWeight += 2;
-                }
-                else if (ihiMapFind(*pFnNameMap, genericName, (LPVOID**)&pReturnData, true))
-                {
-                    addlWeight += 1;
-                }
-                else
-                {
-                    addlWeight = 0;
-                }
-            }
-
-            if (addlWeight ==  0)
-            {
-                if (ihiMapFind(*pImpModuleMap, genericName, (LPVOID**)&pFnNameMap, false))
-                {
-                    addlWeight += 1;
-
-                    if (ihiMapFind(*pFnNameMap, inFnName, (LPVOID**)&pReturnData, true))
-                    {
-                        addlWeight += 2;
-                    }
-                    else if (ihiMapFind(*pFnNameMap, genericName, (LPVOID**)&pReturnData, true))
-                    {
-                        addlWeight += 1;
-                    }
-                    else
-                    {
-                        addlWeight = 0;
-                    }
-                }
-            }
-
-            if (addlWeight == 0)
-            {
-                calcedWeight = 0;
-            }
-            else
-            {
-                calcedWeight += addlWeight;
-            }
-        }
+        return 0;
     }
 
-    if (calcedWeight > 0)
+#if 0
+    if (loadedModuleWeight > 0 || impModuleWeight > 0)
     {
         if (oRetVal && *pReturnData)
         {
             *oRetVal = **pReturnData;
         }
     }
+#endif
 
-    return calcedWeight;
+    if (oRetVal && *pReturnData)
+    {
+        *oRetVal = **pReturnData;
+    }
+
+    return loadedModuleWeight + impModuleWeight;
 }
 
 
 bool
 ihiMapFind(
-    IHI_MAP     *inMap,
-    LPCSTR  inKey,
-    LPVOID      **oValue,
-    bool        inCaseSensitive)
+    PIHI_MAP    inMap,
+    LPCSTR      inKey,
+    LPVOID      *oValue,
+    bool        inDoPrefixMatch)
 /*++
 
 Routine Description:
@@ -1272,39 +1258,48 @@ Routine Description:
 
 Returns:
 
-    false - if memory allocation for new map failed
+    false - if not found
     true - in all other cases
 
 --*/
 {
-    for (IHI_MAP *pCurrent = inMap; pCurrent; pCurrent = pCurrent->Next)
+    bool retVal = false;
+    if (!inDoPrefixMatch)
     {
-        if (inCaseSensitive)
-        {
-            if (strcmp(pCurrent->Key, inKey) == 0)
-            {
-                *oValue = &pCurrent->Value;
-                return true;
-            }
-        }
-        else
+        for (IHI_MAP *pCurrent = inMap; pCurrent; pCurrent = pCurrent->Next)
         {
             if (_stricmp(pCurrent->Key, inKey) == 0)
             {
                 *oValue = &pCurrent->Value;
-                return true;
+                retVal = true;
+                goto End;
+            }
+        }
+    }
+    else
+    {
+        for (IHI_MAP *pCurrent = inMap; pCurrent; pCurrent = pCurrent->Next)
+        {
+            if (_strnicmp(pCurrent->Key, inKey, strlen(pCurrent->Key)) == 0)
+            {
+                *oValue = &pCurrent->Value;
+                retVal = true;
+                goto End;
             }
         }
     }
 
-    return false;
+End:
+
+    return retVal;
 }
 
 
 bool
 ihiMapAssign(
     PIHI_MAP    *ioMap,
-    LPCSTR  inKey,
+    LPCSTR      inKey,
+//    bool        inIsPrefix,
     LPVOID      inValue)
 /*++
 
@@ -1321,41 +1316,24 @@ Returns:
 
 --*/
 {
-    //IHU_DBG_ASSERT(ioMap);
-
     IHI_MAP *tempMap = new IHI_MAP;
-
     if (tempMap == NULL)
     {
         return false;
     }
 
     memset(tempMap, 0, sizeof(IHI_MAP));
-
-    StringCchCopyA(
-                tempMap->Key,
-                MAX_PATH,
-                inKey);
-
+    StringCchCopyA(tempMap->Key, MAX_PATH, inKey);
+//    tempMap->IsPrefix = inIsPrefix;
     tempMap->Value = inValue;
-
     tempMap->Next = NULL;
 
-    if (*ioMap)
+    while (*ioMap)
     {
-        PIHI_MAP pCurrent = *ioMap;
-
-        while(pCurrent->Next)
-        {
-            pCurrent = pCurrent->Next;
-        }
-
-        pCurrent->Next  = tempMap;
+        ioMap = &((*ioMap)->Next);
     }
-    else
-    {
-        *ioMap = tempMap;
-    }
+
+    *ioMap = tempMap;
 
     return true;
 }

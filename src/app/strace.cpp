@@ -372,7 +372,7 @@ Arguments:
                     {
                         case EXCEPTION_BREAKPOINT:
                         {
-                            //IHU_DBG_LOG(TRC_STRACE, HX_LEVEL_INFO, (L"EXCEPTION_BREAKPOINT\n"));
+                            IHU_DBG_LOG_EX(TRC_STRACE, IHU_LEVEL_LOUD, L"EXCEPTION_BREAKPOINT\n");
 
                             if (!processInfected)
                             {
@@ -503,7 +503,7 @@ Arguments:
                     {
                         ghProcess = debugEvent.u.CreateProcessInfo.hProcess;
                     }
-                    //IHU_DBG_LOG(TRC_STRACE, HX_LEVEL_INFO, (L"Create Process\n"));
+                    IHU_DBG_LOG_EX(TRC_STRACE, IHU_LEVEL_LOUD, L"Create Process\n");
                     break;
                 }
                 case EXIT_THREAD_DEBUG_EVENT:
@@ -589,7 +589,7 @@ Arguments:
         DeleteFile(gInjectorDllPath.c_str());
     }
 
-    //IHU_DBG_LOG(TRC_STRACE, HX_LEVEL_INFO, (L"Total thread count = %d\n", threadCount));
+    IHU_DBG_LOG_EX(TRC_STRACE, IHU_LEVEL_LOUD, L"Total thread count = %d\n", threadCount);
 
 funcExit:
 
@@ -627,6 +627,11 @@ Routine Description:
 
     std::wstring filterFileName;
     std::wstring cmdLine = GetCommandLine();
+
+    //
+    // Enable this based on some command line, but keep for now.
+    //
+    IhuSetDbgLogLevel(IHU_LEVEL_INFO);
 
     gView->PrintTitle(L"\nIntellectualHeaven (R) System Call Tracer for XP, 2K3, Vista and Windows 7.\n");
     gView->PrintTitle(L"Copyright (C) Pankaj Garg. All rights reserved.\n\n");

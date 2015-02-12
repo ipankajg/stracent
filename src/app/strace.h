@@ -34,6 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include "ihulib.h"
 
+#define TRC_STRACE IHU_LOGGING_OFF
+
 class CStView
 {
 
