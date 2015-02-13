@@ -28,25 +28,36 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /*++
 
-Module Name:
-
-    serum.h
-
-Module Description:
-
     Declares structures and functions for serum DLL.
 
 --*/
 
 
-#ifndef _INJECTOR_H_
-#define _INJECTOR_H_
+#ifndef _SERUM_H_
+#define _SERUM_H_
 
+#define STRSAFE_NO_DEPRECATE
 #include <windows.h>
+#include <strsafe.h>
+#include <stdio.h>
+#include <string>
+#include <algorithm>
+#include <vector>
+#include <psapi.h>
+#include "ihulib.h"
 
 #define TRC_PATCHIAT IHU_LOGGING_ON
 #define TRC_INJECTOR IHU_LOGGING_OFF
 
+using namespace std;
+
+extern HINSTANCE g_hInstance;
+extern LONG gThreadReferenceCount;
+extern string g_MainExeName;
+
+//
+// Exported functions.
+//
 void
 WINAPI
 IhSerumLoad(
@@ -61,5 +72,345 @@ volatile
 LONG
 WINAPI
 IhSerumGetRefCount();
+
+
+//
+// IAT Patching related structure and functions
+//
+
+// We use this function type to simulate original
+// function call
+typedef PVOID(_stdcall *PFNORIGINAL)(void);
+
+#pragma pack(push)
+#pragma pack(1)
+
+typedef struct _PATCH_CODE
+{
+    struct
+    {
+        BYTE    Call[2];
+        DWORD   pdwAddress;
+        DWORD   dwId;
+        DWORD   dwAddress;
+
+    }Prolog;
+
+}PATCH_CODE;
+
+#pragma pack(pop)
+
+
+void
+ihiInitPatchCode(
+PATCH_CODE      &ioPatchCode,
+ULONG   inApiIndex);
+
+
+void
+ihiPatchProlog();
+
+
+void
+__stdcall
+ihiPatchedFuncEntry(
+    DWORD   **ppStackPos,
+    DWORD   inECX,
+    DWORD   inEDX);
+
+
+void
+ihiPatchUnpatchImports(
+    HANDLE     inModuleHandle,
+    LPCSTR      inModuleBaseName,
+    BYTE    *inModuleBaseAddress,
+    bool            inApplyHook);
+
+
+void
+WINAPI
+ihiPatchUnpatchModules(HINSTANCE hDll, bool inApplyHook);
+
+
+void
+WINAPI
+ihiRemoveUnloadedModules();
+
+// Function typedef to convert a character to uppercase
+typedef char(__cdecl *TO_UPPER)(char);
+
+// Function to convert a char to uppercase
+char
+__cdecl
+ihiToUpper(char c);
+
+//
+// Patching management structures and functions
+//
+
+//
+// Macro for maximum number of modules patched in a process
+//
+#define IHI_MAX_MODULES         1024
+
+//
+// We initially don't know how many APIs we need to hook
+// so we will allocate PATCH_CODE in chunks of X entries
+// to optimize memory allocation.
+//
+#define M_HOOK_ENTRY_CHUNK_SIZE         128
+
+//
+// Max API Name length
+//
+#define MAX_API_NAME_LENGTH             128
+
+//
+// Store information about the return value of an API, if user specified
+// this information in the filter file
+//
+typedef struct _IHI_RETURN_DATA
+{
+    bool    Specified;
+    int     Value;
+
+} IHI_RETURN_DATA, *PIHI_RETURN_DATA;
+
+
+//
+// Stores some information about each patched API
+//
+typedef struct _IHI_API_DATA
+{
+    // API name inside IAT is always in Ascii
+    char                mApiName[MAX_API_NAME_LENGTH];
+
+    // Original address to which a particular API points
+    PVOID               mOriginalAddress;
+
+    // If user specified a different return value, save it here
+    IHI_RETURN_DATA     mReturnData;
+
+}IHI_API_DATA;
+
+//
+// Struct to store information about M_HOOK_ENTRY_CHUNK_SIZE
+// number of patched APIs
+//
+
+struct _IHI_PATCHED_API_DATA;
+
+typedef struct _IHI_PATCHED_API_DATA
+{
+    // Array of IHI_API_DATA. Each memeber of this array has a corresponding
+    // patch code in the mPatchCodeArray array
+    IHI_API_DATA                    mApiData[M_HOOK_ENTRY_CHUNK_SIZE];
+
+    // Array of patch code for various APIs. These are allocated in
+    // M_HOOK_ENTRY_CHUNK_SIZE chunk size
+    PATCH_CODE                      *mPatchCodeArray;
+
+    // Pointer to the next member in this linked list
+    struct _IHI_PATCHED_API_DATA    *Next;
+
+}IHI_PATCHED_API_DATA;
+
+
+//
+// Data structures to manage inclusion/exclusion of functions
+//
+struct _IHI_MAP;
+
+typedef struct _IHI_MAP
+{
+    char                Key[MAX_PATH];
+    bool                IsPrefix;
+    LPVOID              Value;
+    struct _IHI_MAP     *Next;
+
+}IHI_MAP, *PIHI_MAP;
+
+bool
+ihiMapFind(
+    IHI_MAP     *inMap,
+    LPCSTR      inKey,
+    LPVOID      *oValue,
+    bool        inDoPrefixMatch);
+
+
+bool
+ihiMapAssign(
+    PIHI_MAP *ioMap,
+    LPCSTR inKey,
+    LPVOID inValue);
+
+
+//
+// Patch manager class
+//
+class C_PATCH_MANAGER
+{
+public:
+
+    // Constructor
+    C_PATCH_MANAGER();
+
+    // Destructor
+    ~C_PATCH_MANAGER();
+
+
+    void
+        Lock();
+
+    void
+        UnLock();
+
+    //
+    // Functions for API patching
+    //
+    IHI_PATCHED_API_DATA *
+        GetPatchedApiArrayAt(
+        ULONG inIndex);
+
+    // Fix-Me!!!
+    // The name of functions below needs to be
+    // changed to reflect their meaning more clearly
+    //
+    LPVOID
+        GetOrigFuncAddrAt(
+        ULONG inIndex);
+
+    LPVOID
+        GetMatchingOrigFuncAddr(
+        LPVOID pfnPatchedFunction);
+
+    LPCSTR
+        GetFuncNameAt(
+        ULONG inIndex);
+
+    void
+        GetReturnDataAt(
+        ULONG   inIndex,
+        IHI_RETURN_DATA &oReturnData);
+
+    LPVOID
+        InsertNewPatch(
+        LPSTR           inApiName,
+        LPVOID          inOrigFuncAddr,
+        IHI_RETURN_DATA &inRetValInfo);
+
+    void
+        RemoveAllPatches();
+
+    //
+    // House-Keeping functions to maintain which modules
+    // are patched and which aren't.
+    //
+    bool
+        IsModulePatched(
+        HANDLE inModuleHandle);
+
+    void
+        AddModuleToPatchedList(
+        HANDLE inModuleHandle);
+
+    void
+        RemoveModuleFromPatchedList(
+        HANDLE inModuleHandle);
+
+    HANDLE
+        GetPatchedModulesHandle(
+        ULONG moduleIndex);
+
+    ULONG
+        GetPatchedModulesCount();
+
+private:
+    // Used to synchronize access to patch manager database
+    // Client application should determine when to lock it
+    // At minimum, It should be locked when any write operation
+    // happens in the patch manager, such as patching/removing
+    // a module or patching a new api
+    HANDLE                      mPatchManagerMutex;
+
+    // For patched APIs
+    IHI_PATCHED_API_DATA        *mPatchedApiListHead;
+    IHI_PATCHED_API_DATA        *mPatchedApiListTail;
+    ULONG                       mPatchedApiCount;
+
+    // For patched Modules
+    HANDLE                      mPatchedModuleList[IHI_MAX_MODULES];
+    ULONG                       mPatchedModuleCount;
+
+    // Used to decide patches lifetime
+    bool                        mPatchesRemoved;
+};
+
+//
+// global object to manage patched functions
+//
+extern C_PATCH_MANAGER  gPatchManager;
+
+//
+// Class to manage inclusion/exclusion list for patching
+//
+class C_PATCH_INCL_EXCL_MGR
+{
+public:
+
+    // Constructor/Destructor
+    C_PATCH_INCL_EXCL_MGR();
+    ~C_PATCH_INCL_EXCL_MGR();
+
+    // Functions
+    void
+        SetInclExclList(
+        LPCSTR  inFnIncludes,
+        LPCSTR  inFnExcludes);
+
+    void
+        BuildInclOrExclList(
+        std::string         inFnList,
+        PIHI_MAP            *ioMap);
+
+    bool
+        PatchRequired(
+        LPCSTR      loadedModuleName,
+        LPCSTR      impModuleName,
+        LPCSTR      fnName,
+        bool            inOrdinalExport,
+        IHI_RETURN_DATA *oRetVal);
+
+    int
+        CalcWeight(
+        PIHI_MAP            inLoadedModuleMap,
+        LPCSTR              inLoadedModuleName,
+        LPCSTR              inImpModuleName,
+        LPCSTR              inFnName,
+        IHI_RETURN_DATA     *oRetVal);
+
+    int
+        CalcFnMatchWeight(
+        PIHI_MAP inFnMap,
+        LPCSTR inFnName,
+        LPVOID *oReturnData);
+
+    int
+        CalcImpModuleMatchWeight(
+        PIHI_MAP inImpModuleMap,
+        LPCSTR inImpModuleName,
+        LPCSTR inFnName,
+        LPVOID *oReturnData);
+
+private:
+    PIHI_MAP        m_IncludeList;
+    PIHI_MAP        m_ExcludeList;
+};
+
+
+//
+// global object to manage inclusion/exclusion
+//
+extern C_PATCH_INCL_EXCL_MGR gPatchInclExclMgr;
 
 #endif

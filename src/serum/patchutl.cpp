@@ -41,23 +41,13 @@ Module Description:
 
 --*/
 
-#define STRSAFE_NO_DEPRECATE
-
-#include <windows.h>
-#include <strsafe.h>
-#include "ihulib.h"
-#include "patchIAT.h"
-#include "patchutl.h"
+#include "serum.h"
 
 //
 // Used to convert a character to uppercase
 //
 TO_UPPER gToUpper = ihiToUpper;
 
-//
-// main process executable name
-//
-extern std::string g_MainExeName;
 
 /*++
 

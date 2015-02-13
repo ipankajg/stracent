@@ -16,8 +16,6 @@
     <ClCompile Include="..\src\serum\serum.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\serum\patchIAT.h" />
-    <ClInclude Include="..\src\serum\patchutl.h" />
     <ClInclude Include="..\src\serum\serum.h" />
   </ItemGroup>
   <ItemGroup>

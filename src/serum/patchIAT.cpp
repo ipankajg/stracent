@@ -41,13 +41,8 @@ Module Description:
 
 --*/
 
-#include <windows.h>
-#include <stdio.h>
-#include <algorithm>
-#include <vector>
-#include <psapi.h>
-#include "ihulib.h"
-#include "patchutl.h"
+
+#include "serum.h"
 
 //
 // Variable only to aid debugging
@@ -63,17 +58,6 @@ C_PATCH_MANAGER gPatchManager;
 // Used to manage patch inclusion/exclusion list.
 //
 C_PATCH_INCL_EXCL_MGR gPatchInclExclMgr;
-
-//
-// Handle to our DLL. This handle is used to make sure/ that we don't
-// patch ourselves when we are patching various modules.
-//
-extern HINSTANCE g_hInstance;
-
-//
-// Used to maintain the count of number of threads attached to our injector DLL.
-//
-extern LONG gThreadReferenceCount;
 
 
 typedef enum _PROCESSINFOCLASS {

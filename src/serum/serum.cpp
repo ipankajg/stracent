@@ -28,28 +28,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /*++
 
-Module Name:
-
-    serum.cpp
-
 Module Description:
 
-    Implements the basic routines required for DLL initialization
-    and uninitialization.
+    Implements DllMain and other exported routines.
 
 --*/
 
-#include <windows.h>
-#include <stdio.h>
-#include <string>
-#include <psapi.h>
-#include "ihulib.h"
 #include "serum.h"
-#include "patchIAT.h"
-#include "patchutl.h"
 
 //
-// Global handle to DLL Instance
+// Global handle to DLL Instance. This handle is used to make sure/ that we
+// don't patch ourselves when we are patching various modules.
+//
 //
 HINSTANCE g_hInstance = NULL;
 
