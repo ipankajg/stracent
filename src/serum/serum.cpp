@@ -107,6 +107,35 @@ IhSerumLoad(
     //
     IhuSetDbgLogLevel(IHU_LEVEL_INFO);
 
+    __asm
+    {
+        push eax;
+        push ebx;
+
+        //
+        // Clear PEB.BeingDebugged.
+        //
+        mov eax, dword ptr fs:[0x30];
+        mov byte ptr [eax + 0x2], 0;
+
+        //
+        // Clear PEB.NtGlobalFlag
+        //
+        mov dword ptr [eax + 0x68], 0;
+
+        //
+        // Clear ProcessHeap.ForceFlags
+        //
+        mov ebx, dword ptr [eax + 0x18];
+        lea eax, [ebx + 0xc];
+        mov dword ptr [eax], 2;
+        lea eax, [ebx + 0x10];
+        mov dword ptr [eax], 0;
+
+        pop ebx;
+        pop eax;
+    }
+
     char szModuleName[MAX_PATH] = {0};
 
     if (GetModuleBaseNameA(

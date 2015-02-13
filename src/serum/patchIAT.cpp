@@ -668,21 +668,15 @@ LPVOID GetPtrFromRVA(DWORD rva, PIMAGE_NT_HEADERS pNTHeader, DWORD imageBase)
 }
 
 
-
-BOOL ihiGetFileImportDescriptor(LPSTR filename, PIMAGE_NT_HEADERS *INTHPtr, PIMAGE_IMPORT_DESCRIPTOR *IIDPtr, PBYTE *BaseAddress)
+LPBYTE ihiCreateFileMapping(LPCWSTR fileName)
 {
     HANDLE hFile;
     HANDLE hFileMapping;
     LPBYTE lpFileBase;
-    PIMAGE_DOS_HEADER pIDH;
-    PIMAGE_NT_HEADERS pINTH = NULL;
-    PIMAGE_IMPORT_DESCRIPTOR pIID = NULL;
-    DWORD dwImportTableOffset;
-    BOOL result;
 
-    result = FALSE;
+    lpFileBase = NULL;
 
-    hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
+    hFile = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL,
         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 
     if (hFile == INVALID_HANDLE_VALUE)
@@ -700,29 +694,51 @@ BOOL ihiGetFileImportDescriptor(LPSTR filename, PIMAGE_NT_HEADERS *INTHPtr, PIMA
     }
 
     lpFileBase = (LPBYTE)MapViewOfFile(hFileMapping, FILE_MAP_READ, 0, 0, 0);
-    if (lpFileBase == 0)
+    if (lpFileBase == NULL)
     {
         CloseHandle(hFileMapping);
         CloseHandle(hFile);
         IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Couldn't map view of file with MapViewOfFile()\n");
         goto Exit;
     }
+ 
+Exit:
+    return lpFileBase;
+}
+
+
+BOOL ihiGetFileImportDescriptor(LPCWSTR fileName, PIMAGE_NT_HEADERS *INTHPtr, PIMAGE_IMPORT_DESCRIPTOR *IIDPtr, PBYTE *BaseAddress)
+{
+    LPBYTE lpFileBase;
+    PIMAGE_DOS_HEADER pIDH;
+    PIMAGE_NT_HEADERS pINTH = NULL;
+    PIMAGE_IMPORT_DESCRIPTOR pIID = NULL;
+    DWORD importTableRVA;
+    BOOL result;
+
+    result = FALSE;
+
+    lpFileBase = ihiCreateFileMapping(fileName);
+    if (lpFileBase == NULL)
+    {
+        goto Exit;
+    }
 
     pIDH = (PIMAGE_DOS_HEADER)lpFileBase;
     if (pIDH->e_magic == IMAGE_DOS_SIGNATURE)
     {
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Module for file %S is PE format.\n", filename);
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Module for file %s is PE format.\n", fileName);
         pINTH = (PIMAGE_NT_HEADERS)(lpFileBase + pIDH->e_lfanew);
-        dwImportTableOffset = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-        if (dwImportTableOffset == 0)
+        importTableRVA = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+        if (importTableRVA == 0)
         {
             IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
-                L"PatchFailure: No Import Table Offset for module: %S.\n",
-                filename);
+                L"PatchFailure: No Import Table Offset for module: %s.\n",
+                fileName);
             goto Exit;
         }
-        // pIID = (PIMAGE_IMPORT_DESCRIPTOR)(lpFileBase + dwImportTableOffset);
-        pIID = (PIMAGE_IMPORT_DESCRIPTOR)GetPtrFromRVA(dwImportTableOffset, pINTH, (DWORD)lpFileBase);
+        // pIID = (PIMAGE_IMPORT_DESCRIPTOR)(lpFileBase + importTableRVA);
+        pIID = (PIMAGE_IMPORT_DESCRIPTOR)GetPtrFromRVA(importTableRVA, pINTH, (DWORD)lpFileBase);
 #if 0
         IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Here3. %d\n", pIID->OriginalFirstThunk);
         if (pIID->OriginalFirstThunk != 0)
@@ -736,16 +752,11 @@ BOOL ihiGetFileImportDescriptor(LPSTR filename, PIMAGE_NT_HEADERS *INTHPtr, PIMA
     }
     else
     {
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"unrecognized file format\n");
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"unrecognized file format for file: %s\n", fileName);
         goto Exit;
     }
 
     result = TRUE;
-    goto Exit;
-
-    UnmapViewOfFile(lpFileBase);
-    CloseHandle(hFileMapping);
-    CloseHandle(hFile);
 
 Exit:
     *INTHPtr = pINTH;
@@ -761,7 +772,7 @@ ihiGetModuleImportDescriptor(PBYTE inModuleBaseAddress, LPCSTR inModuleBaseName,
     PIMAGE_DOS_HEADER           pIDH;
     PIMAGE_NT_HEADERS           pINTH;
     PIMAGE_IMPORT_DESCRIPTOR    pIID;
-    DWORD                       dwImportTableOffset;
+    DWORD                       importTableRVA;
     BOOL result;
 
     pINTH = NULL;
@@ -777,21 +788,118 @@ ihiGetModuleImportDescriptor(PBYTE inModuleBaseAddress, LPCSTR inModuleBaseName,
         goto Exit;
     }
     pINTH = (PIMAGE_NT_HEADERS)(inModuleBaseAddress + pIDH->e_lfanew);
-    dwImportTableOffset = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-    if (dwImportTableOffset == 0)
+    importTableRVA = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+    if (importTableRVA == 0)
     {
         IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
             L"PatchFailure: No Import Table Offset for module: %S.\n",
             inModuleBaseName);
         goto Exit;
     }
-    pIID = (PIMAGE_IMPORT_DESCRIPTOR)(inModuleBaseAddress + dwImportTableOffset);
+    pIID = (PIMAGE_IMPORT_DESCRIPTOR)(inModuleBaseAddress + importTableRVA);
     result = TRUE;
 
 Exit:
 
     *INTHPtr = pINTH;
     *IIDPtr = pIID;
+    return result;
+}
+
+BOOL
+ihiGetExportedFunctionName(LPCWSTR inModuleName, WORD inOrdinal, LPSTR outFnName, DWORD inFnNameSize)
+{
+    wchar_t fileName[MAX_PATH + 1];
+    HMODULE modHandle;
+    LPBYTE lpFileBase;
+    PIMAGE_DOS_HEADER pIDH;
+    PIMAGE_NT_HEADERS pINTH = NULL;
+    PIMAGE_EXPORT_DIRECTORY pIED;
+    DWORD exportTableRVA;
+    LPSTR* pNames;
+    PWORD pOrdinals;
+    BOOL result;
+    DWORD i;
+
+    result = FALSE;
+    
+    modHandle = GetModuleHandle(inModuleName);
+    if (modHandle == NULL)
+    {
+        goto Exit;
+    }
+
+    fileName[MAX_PATH] = L'\0';
+    if (!GetModuleFileName(modHandle, fileName, MAX_PATH))
+    {
+        goto Exit;
+    }
+
+    lpFileBase = ihiCreateFileMapping(fileName);
+    if (lpFileBase == NULL)
+    {
+        goto Exit;
+    }
+
+    pIDH = (PIMAGE_DOS_HEADER)lpFileBase;
+    if (pIDH->e_magic == IMAGE_DOS_SIGNATURE)
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Module for file %s is PE format.\n", fileName);
+        pINTH = (PIMAGE_NT_HEADERS)(lpFileBase + pIDH->e_lfanew);
+        exportTableRVA = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+        if (exportTableRVA == 0)
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+                L"PatchFailure: No Export Table Offset for module: %s.\n",
+                fileName);
+            goto Exit;
+        }
+        pIED = (PIMAGE_EXPORT_DIRECTORY)GetPtrFromRVA(exportTableRVA, pINTH, (DWORD)lpFileBase);
+        if (pIED == NULL)
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+                L"PatchFailure: Unable to find Export Table for module: %s.\n",
+                fileName);
+            goto Exit;
+        }
+        pOrdinals = (PWORD)GetPtrFromRVA(pIED->AddressOfNameOrdinals, pINTH, (DWORD)lpFileBase);
+        pNames = (LPSTR*)GetPtrFromRVA(pIED->AddressOfNames, pINTH, (DWORD)lpFileBase);
+        if (pOrdinals == NULL || pNames == NULL)
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Name or Ordinal Array is NULL\n");
+            goto Exit;
+        }
+        for (i = 0; i < pIED->NumberOfNames; i++)
+        {
+            
+            WORD ordinal = pOrdinals[i] + (WORD)pIED->Base;
+            if (_IhuDbgLogLevel <= IHU_LEVEL_FLOOD)
+            {
+                LPSTR name = (LPSTR)GetPtrFromRVA((DWORD)pNames[i], pINTH, (DWORD)lpFileBase);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FLOOD, L"Ordinal: %x\n", ordinal);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FLOOD, L"Name: %S\n", name);
+            }
+            if (ordinal == inOrdinal)
+            {
+                LPSTR name = (LPSTR)GetPtrFromRVA((DWORD)pNames[i], pINTH, (DWORD)lpFileBase);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Ordinal: %x\n", ordinal);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Name: %S\n", name);
+                if (strlen(name) < inFnNameSize)
+                {
+                    strcpy(outFnName, name);
+                    result = TRUE;
+                }
+                else
+                {
+                    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Failed to copy exported function name - supplied buffer is smaller.\n");
+                }
+                goto Exit;
+            }
+        }
+    }
+
+Exit:
+
     return result;
 }
 
@@ -852,11 +960,14 @@ ihiPatchUnpatchImports(
     
     if (GetModuleHandle(NULL) == inModuleHandle)
     {
-        if (ihiGetFileImportDescriptor(
-                "C:\\Users\\ipankajg\\Source\\github\\stracent\\bld\\final\\xADT2.exe",
-                &pINTH_File, &pIID_File, &moduleBaseAddress_File))
+        wchar_t fileName[MAX_PATH + 1];
+        fileName[MAX_PATH] = L'\0';
+        if (GetModuleFileName(GetModuleHandle(NULL), fileName, MAX_PATH))
         {
-            fileIIDAvailable = TRUE;
+            if (ihiGetFileImportDescriptor(fileName, &pINTH_File, &pIID_File, &moduleBaseAddress_File))
+            {
+                fileIIDAvailable = TRUE;
+            }
         }
     }
 
@@ -898,13 +1009,13 @@ ihiPatchUnpatchImports(
             if (fileIIDAvailable && pIID_File->FirstThunk != 0)
             {
                 IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
-                    L"Module OriginalFirstThunk is Zero, trying to use this information from module binary on disk.\n");
+                    L"Module OriginalFirstThunk is Zero, locate from module binary on disk.\n");
                 useFileIID = TRUE;
             }
             else
             {
                 IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
-                    L"Module OriginalFirstThunk is Zero and module's binary on disk is not available.\n");
+                    L"Module OriginalFirstThunk is Zero, module binary on disk is not present.\n");
                 break;
             }
 
@@ -912,7 +1023,7 @@ ihiPatchUnpatchImports(
             if (pIINA == NULL)
             {
                 IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
-                    L"Module's binary on disk does not have FirstThunk information either, skipping this module's patching.\n");
+                    L"Module binary on disk does not have FirstThunk, skipping this module's patching.\n");
                 break;
             }
         }
@@ -943,7 +1054,7 @@ ihiPatchUnpatchImports(
                 if (pIINA != NULL)
                 {
                     LPSTR fnName = NULL;
-                    char ordString[32];
+                    char fnNameBuffer[MAX_PATH];
                     bool exportedByOrdinal = false;
                     if (!IMAGE_SNAP_BY_ORDINAL(pIINA->u1.Ordinal))
                     {
@@ -961,14 +1072,19 @@ ihiPatchUnpatchImports(
                     }
                     else
                     {
-                        // Exported by ordinal
-                        // To-Do!!!
-                        // At this point, we can instead load the binary image
-                        // from the module file on disk and get the function name
-                        // string
-                        sprintf(ordString, "Ord%x", pIINA->u1.Ordinal);
-                        fnName = ordString;
-                        exportedByOrdinal = true;
+                        WORD ordinal = (WORD)(pIINA->u1.Ordinal & ~IMAGE_ORDINAL_FLAG32);
+                        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Import by ordinal: %x, locate name in export table.\n", ordinal);
+                        if (ihiGetExportedFunctionName(pwszModule, ordinal, fnNameBuffer, MAX_PATH))
+                        {
+                            fnName = fnNameBuffer;
+                        }
+                        else
+                        {
+                            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Unable to locate function, generating name from Ordinal.\n", ordinal);
+                            sprintf(fnNameBuffer, "Ord%x", ordinal);
+                            fnName = fnNameBuffer;
+                            exportedByOrdinal = true;
+                        }
                     }
 
                     //
