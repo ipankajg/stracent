@@ -28,727 +28,289 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /*++
 
-Module Name:
-
-    patchutl.cpp
-
 Module Description:
 
-    Implements house-keeping for patched functions like their
-    name, original return address and patched address etc. Also
-    implements exclusion/inclusion for patched functions and
-    modules.
+    Implements utility functions like MAP management, reading Import/
+    Export table etc.
 
 --*/
 
 #include "serum.h"
 
-//
-// Used to convert a character to uppercase
-//
-TO_UPPER gToUpper = ihiToUpper;
 
-
-/*++
-
-Routine Name:
-
-    ihiToUpper
-
-Routine Description:
-
-    Converts a character to uppercase. It is implemented to
-    remove warnings generated due to use of int in toupper.
-
-Return:
-
-    Upper case character
-
---*/
-char
-__cdecl
-ihiToUpper(char c)
+PIMAGE_SECTION_HEADER ihiGetEnclosingSection(DWORD relVA, PIMAGE_NT_HEADERS inINTH)
 {
-    return (char)toupper((char)c);
-}
+    PIMAGE_SECTION_HEADER section = IMAGE_FIRST_SECTION(inINTH);
+    unsigned i;
 
-
-/*++
-
-Routine Name:
-
-    C_PATCH_MANAGER
-
-Routine Description:
-
-    Constructs a Patch manager object
-
-Return:
-
-    none
-
---*/
-C_PATCH_MANAGER::C_PATCH_MANAGER()
-{
-    mPatchManagerMutex = CreateMutex(NULL, FALSE, NULL);
-
-    mPatchedApiListHead = NULL;
-    mPatchedApiListTail = NULL;
-    mPatchedApiCount = 0;
-
-    mPatchedModuleCount = 0;
-    memset(mPatchedModuleList, 0, sizeof(mPatchedModuleList));
-
-    mPatchesRemoved = false;
-}
-
-
-/*++
-
-Routine Name:
-
-    ~C_PATCH_MANAGER
-
-Routine Description:
-
-    Destroys a Patch manager object
-
-Return:
-
-    none
-
---*/
-C_PATCH_MANAGER::~C_PATCH_MANAGER()
-{
-    // Reset the list of patched API
-    mPatchedApiListHead = NULL;
-    mPatchedApiListTail = NULL;
-    mPatchedApiCount    = 0;
-
-    // Reset the patched module count
-    mPatchedModuleCount = 0;
-
-    // close the handles to the mutex created for patching
-    // house-keeping
-    CloseHandle(mPatchManagerMutex);
-}
-
-
-/*++
-
-Routine Name:
-
-    Lock
-
-Routine Description:
-
-    Lock the patch manager object for write access
-
-Return:
-
-    none
-
---*/
-void
-C_PATCH_MANAGER::Lock()
-{
-    WaitForSingleObject(mPatchManagerMutex, INFINITE);
-}
-
-
-/*++
-
-Routine Name:
-
-    UnLock
-
-Routine Description:
-
-    UnLock the patch manager object once write operations
-    are done
-
-Return:
-
-    none
-
---*/
-void
-C_PATCH_MANAGER::UnLock()
-{
-    ReleaseMutex(mPatchManagerMutex);
-}
-
-
-/*++
-
-Routine Name:
-
-    InsertNewPatch
-
-Routine Description:
-
-    Allocates memory for code and data for a new patch and add
-    it to the global list.
-
-    Memory is allocated in chunks of M_HOOK_ENTRY_CHUNK_SIZE
-    to make patching efficient. Once we hit the limit on one
-    chunk we allocate next chunk of memory and add it to our list.
-
-To-Do!!!
-    APIs even if imported in two modules should still have a common
-    Hook entry if both name and original address are same.
-
-Return:
-
-    Prolog code address  - if we could allocate memory
-    NULL - otherwise
-
---*/
-LPVOID
-C_PATCH_MANAGER::InsertNewPatch(
-    LPSTR           inApiName,
-    LPVOID          inOrigFuncAddr,
-    IHI_RETURN_DATA &inReturnData)
-{
-    LPVOID funcReturn = NULL;
-    IHI_PATCHED_API_DATA *patchedApiArray = NULL;
-
-    ULONG tableIndex = mPatchedApiCount / M_HOOK_ENTRY_CHUNK_SIZE;
-    ULONG entryIndex = mPatchedApiCount % M_HOOK_ENTRY_CHUNK_SIZE;
-
-    if ((mPatchedApiCount % M_HOOK_ENTRY_CHUNK_SIZE) == 0)
+    for (i = 0; i < inINTH->FileHeader.NumberOfSections; i++, section++)
     {
-        patchedApiArray = (IHI_PATCHED_API_DATA *)
-                                            VirtualAlloc(
-                                                NULL,
-                                                sizeof(IHI_PATCHED_API_DATA),
-                                                MEM_COMMIT,
-                                                PAGE_READWRITE);
-
-        if (patchedApiArray == NULL)
+        // Is the RVA within this section?
+        if ((relVA >= section->VirtualAddress) &&
+            (relVA < (section->VirtualAddress + section->Misc.VirtualSize)))
         {
-            goto funcEnd;
-        }
-
-        if (mPatchedApiListTail)
-        {
-            mPatchedApiListTail->Next   = patchedApiArray;
-        }
-
-        patchedApiArray->Next       = NULL;
-        mPatchedApiListTail         = patchedApiArray;
-
-        if (mPatchedApiListHead == NULL)
-        {
-            mPatchedApiListHead = patchedApiArray;
-        }
-
-        patchedApiArray->mPatchCodeArray = (PATCH_CODE *)
-                                            VirtualAlloc(
-                                                NULL,
-                                                sizeof(PATCH_CODE) * M_HOOK_ENTRY_CHUNK_SIZE,
-                                                MEM_COMMIT,
-                                                PAGE_EXECUTE_READWRITE);
-
-        if (patchedApiArray->mPatchCodeArray == NULL)
-        {
-            goto funcEnd;
+            return section;
         }
     }
 
-    patchedApiArray = GetPatchedApiArrayAt(tableIndex);
+    return 0;
+}
 
-    ihiInitPatchCode(
-            patchedApiArray->mPatchCodeArray[entryIndex],
-            mPatchedApiCount);
+LPVOID ihiGetPtrFromRVA(DWORD relVA, PIMAGE_NT_HEADERS inINTH, DWORD inBaseAddress)
+{
+    PIMAGE_SECTION_HEADER pISH;
+    INT delta;
 
-    StringCchCopyA(
-        patchedApiArray->mApiData[entryIndex].mApiName,
-        MAX_API_NAME_LENGTH,
-        inApiName);
-
-    patchedApiArray->mApiData[entryIndex].mOriginalAddress  = inOrigFuncAddr;
-    patchedApiArray->mApiData[entryIndex].mReturnData       = inReturnData;
-
-    // one more api patched
-    mPatchedApiCount++;
-
-    funcReturn = &patchedApiArray->mPatchCodeArray[entryIndex].Prolog;
-
-funcEnd:
-
-    if (funcReturn == NULL)
+    pISH = ihiGetEnclosingSection(relVA, inINTH);
+    if (!pISH)
     {
-        if (patchedApiArray)
-        {
-            VirtualFree(patchedApiArray, 0, MEM_RELEASE);
-        }
+        return 0;
     }
 
-    return funcReturn;
+    delta = (INT)(pISH->VirtualAddress - pISH->PointerToRawData);
+    return (PVOID)(inBaseAddress + relVA - delta);
 }
 
 
-IHI_PATCHED_API_DATA *
-C_PATCH_MANAGER::GetPatchedApiArrayAt(
-    ULONG inIndex)
-/*++
-
-Routine Description:
-
-    Returns the Patched API array at the given index
-
-Return:
-
-    returns patched API array
-
---*/
+LPBYTE ihiCreateFileMapping(LPCWSTR fileName)
 {
-    IHI_PATCHED_API_DATA *pCurrent = mPatchedApiListHead;
+    HANDLE hFile;
+    HANDLE hFileMapping;
+    LPBYTE lpFileBase;
 
-    for (ULONG i = 0; i < inIndex; i++)
+    lpFileBase = NULL;
+
+    hFile = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL,
+        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+
+    if (hFile == INVALID_HANDLE_VALUE)
     {
-        if (pCurrent == NULL)
-        {
-            //IHU_DBG_ASSERT(FALSE);
-            break;
-        }
-
-        pCurrent = pCurrent->Next;
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Couldn't open file with CreateFile()\n");
+        goto Exit;
     }
 
-    return pCurrent;
-}
-
-
-LPVOID
-C_PATCH_MANAGER::GetOrigFuncAddrAt(
-    ULONG inIndex)
-/*++
-
-Routine Description:
-
-    Returns the address of original function, that
-    we patched, at given index
-
-Return:
-
-    Original Function address  - if inIndex is valid
-    NULL - otherwise
-
---*/
-{
-    //IHU_DBG_ASSERT(inIndex < mPatchedApiCount);
-
-    ULONG tableIndex = inIndex / M_HOOK_ENTRY_CHUNK_SIZE;
-    ULONG entryIndex = inIndex % M_HOOK_ENTRY_CHUNK_SIZE;
-
-    IHI_PATCHED_API_DATA *patchedApiArray = GetPatchedApiArrayAt(tableIndex);
-
-    return (LPVOID)patchedApiArray->mApiData[entryIndex].mOriginalAddress;
-}
-
-
-/*++
-
-Routine Name:
-
-    GetMatchingOrigFuncAddr
-
-Routine Description:
-
-    Returns the address of original function corresponding
-    to a patch address
-
-Return:
-
-    Original Function address  - if Patched address if found
-    NULL - otherwise
-
---*/
-LPVOID
-C_PATCH_MANAGER::GetMatchingOrigFuncAddr(
-    LPVOID pfnPatchedFunction)
-{
-    IHI_PATCHED_API_DATA *pPatchedApiArray = mPatchedApiListHead;
-
-    while (pPatchedApiArray)
+    hFileMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+    if (hFileMapping == 0)
     {
-        for (int i = 0; i < M_HOOK_ENTRY_CHUNK_SIZE; ++i)
+        CloseHandle(hFile);
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Couldn't open file mapping with CreateFileMapping()\n");
+        goto Exit;
+    }
+
+    lpFileBase = (LPBYTE)MapViewOfFile(hFileMapping, FILE_MAP_READ, 0, 0, 0);
+    if (lpFileBase == NULL)
+    {
+        CloseHandle(hFileMapping);
+        CloseHandle(hFile);
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Couldn't map view of file with MapViewOfFile()\n");
+        goto Exit;
+    }
+
+Exit:
+    return lpFileBase;
+}
+
+
+BOOL ihiGetFileImportDescriptor(LPCWSTR fileName, PIMAGE_NT_HEADERS *INTHPtr,
+    PIMAGE_IMPORT_DESCRIPTOR *IIDPtr, PBYTE *BaseAddress)
+{
+    LPBYTE lpFileBase;
+    PIMAGE_DOS_HEADER pIDH;
+    PIMAGE_NT_HEADERS pINTH = NULL;
+    PIMAGE_IMPORT_DESCRIPTOR pIID = NULL;
+    DWORD importTableRVA;
+    BOOL result;
+
+    result = FALSE;
+
+    lpFileBase = ihiCreateFileMapping(fileName);
+    if (lpFileBase == NULL)
+    {
+        goto Exit;
+    }
+
+    pIDH = (PIMAGE_DOS_HEADER)lpFileBase;
+    if (pIDH->e_magic == IMAGE_DOS_SIGNATURE)
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Module for file %s is PE format.\n", fileName);
+        pINTH = (PIMAGE_NT_HEADERS)(lpFileBase + pIDH->e_lfanew);
+        importTableRVA = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+        if (importTableRVA == 0)
         {
-            if ((DWORD_PTR)&pPatchedApiArray->mPatchCodeArray[i].Prolog == (DWORD_PTR)pfnPatchedFunction)
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+                L"PatchFailure: No Import Table Offset for module: %s.\n",
+                fileName);
+            goto Exit;
+        }
+        // pIID = (PIMAGE_IMPORT_DESCRIPTOR)(lpFileBase + importTableRVA);
+        pIID = (PIMAGE_IMPORT_DESCRIPTOR)ihiGetPtrFromRVA(importTableRVA, pINTH, (DWORD)lpFileBase);
+#if 0
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Here3. %d\n", pIID->OriginalFirstThunk);
+        if (pIID->OriginalFirstThunk != 0)
+        {
+            // pIINA = (PIMAGE_THUNK_DATA)(lpFileBase + (DWORD)pIID->OriginalFirstThunk);
+            // Adjust the pointer to point where the tables are in the
+            // mem mapped file.
+            pIINA = (PIMAGE_THUNK_DATA)ihiGetPtrFromRVA((DWORD)pIID->OriginalFirstThunk, pINTH, lpFileBase);
+        }
+#endif
+    }
+    else
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"unrecognized file format for file: %s\n", fileName);
+        goto Exit;
+    }
+
+    result = TRUE;
+
+Exit:
+    *INTHPtr = pINTH;
+    *IIDPtr = pIID;
+    *BaseAddress = lpFileBase;
+    return result;
+}
+
+
+BOOL ihiGetModuleImportDescriptor(PBYTE inModuleBaseAddress, LPCSTR inModuleBaseName,
+    PIMAGE_NT_HEADERS *INTHPtr, PIMAGE_IMPORT_DESCRIPTOR *IIDPtr)
+{
+    PIMAGE_DOS_HEADER           pIDH;
+    PIMAGE_NT_HEADERS           pINTH;
+    PIMAGE_IMPORT_DESCRIPTOR    pIID;
+    DWORD                       importTableRVA;
+    BOOL result;
+
+    pINTH = NULL;
+    pIID = NULL;
+    result = FALSE;
+
+    pIDH = (PIMAGE_DOS_HEADER)inModuleBaseAddress;
+    if (IsBadReadPtr(inModuleBaseAddress, sizeof(IMAGE_DOS_HEADER)))
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+            L"PatchFailure: Unable to read IMAGE_DOS_HEADER for module: %S.\n",
+            inModuleBaseName);
+        goto Exit;
+    }
+    pINTH = (PIMAGE_NT_HEADERS)(inModuleBaseAddress + pIDH->e_lfanew);
+    importTableRVA = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+    if (importTableRVA == 0)
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+            L"PatchFailure: No Import Table Offset for module: %S.\n",
+            inModuleBaseName);
+        goto Exit;
+    }
+    pIID = (PIMAGE_IMPORT_DESCRIPTOR)(inModuleBaseAddress + importTableRVA);
+    result = TRUE;
+
+Exit:
+
+    *INTHPtr = pINTH;
+    *IIDPtr = pIID;
+    return result;
+}
+
+BOOL ihiGetExportedFunctionName(LPCWSTR inModuleName, WORD inOrdinal,
+    LPSTR outFnName, DWORD inFnNameSize)
+{
+    wchar_t fileName[MAX_PATH + 1];
+    HMODULE modHandle;
+    LPBYTE lpFileBase;
+    PIMAGE_DOS_HEADER pIDH;
+    PIMAGE_NT_HEADERS pINTH = NULL;
+    PIMAGE_EXPORT_DIRECTORY pIED;
+    DWORD exportTableRVA;
+    LPSTR* pNames;
+    PWORD pOrdinals;
+    BOOL result;
+    DWORD i;
+
+    result = FALSE;
+
+    modHandle = GetModuleHandle(inModuleName);
+    if (modHandle == NULL)
+    {
+        goto Exit;
+    }
+
+    fileName[MAX_PATH] = L'\0';
+    if (!GetModuleFileName(modHandle, fileName, MAX_PATH))
+    {
+        goto Exit;
+    }
+
+    lpFileBase = ihiCreateFileMapping(fileName);
+    if (lpFileBase == NULL)
+    {
+        goto Exit;
+    }
+
+    pIDH = (PIMAGE_DOS_HEADER)lpFileBase;
+    if (pIDH->e_magic == IMAGE_DOS_SIGNATURE)
+    {
+        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Module for file %s is PE format.\n", fileName);
+        pINTH = (PIMAGE_NT_HEADERS)(lpFileBase + pIDH->e_lfanew);
+        exportTableRVA = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+        if (exportTableRVA == 0)
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+                L"PatchFailure: No Export Table Offset for module: %s.\n",
+                fileName);
+            goto Exit;
+        }
+        pIED = (PIMAGE_EXPORT_DIRECTORY)ihiGetPtrFromRVA(exportTableRVA, pINTH, (DWORD)lpFileBase);
+        if (pIED == NULL)
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
+                L"PatchFailure: Unable to find Export Table for module: %s.\n",
+                fileName);
+            goto Exit;
+        }
+        pOrdinals = (PWORD)ihiGetPtrFromRVA(pIED->AddressOfNameOrdinals, pINTH, (DWORD)lpFileBase);
+        pNames = (LPSTR*)ihiGetPtrFromRVA(pIED->AddressOfNames, pINTH, (DWORD)lpFileBase);
+        if (pOrdinals == NULL || pNames == NULL)
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Name or Ordinal Array is NULL\n");
+            goto Exit;
+        }
+        for (i = 0; i < pIED->NumberOfNames; i++)
+        {
+
+            WORD ordinal = pOrdinals[i] + (WORD)pIED->Base;
+            if (_IhuDbgLogLevel <= IHU_LEVEL_FLOOD)
             {
-                return pPatchedApiArray->mApiData[i].mOriginalAddress;
+                LPSTR name = (LPSTR)ihiGetPtrFromRVA((DWORD)pNames[i], pINTH, (DWORD)lpFileBase);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FLOOD, L"Ordinal: %x\n", ordinal);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FLOOD, L"Name: %S\n", name);
+            }
+            if (ordinal == inOrdinal)
+            {
+                LPSTR name = (LPSTR)ihiGetPtrFromRVA((DWORD)pNames[i], pINTH, (DWORD)lpFileBase);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Ordinal: %x\n", ordinal);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Name: %S\n", name);
+                if (strlen(name) < inFnNameSize)
+                {
+                    strcpy(outFnName, name);
+                    result = TRUE;
+                }
+                else
+                {
+                    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Failed to copy exported function name - supplied buffer is smaller.\n");
+                }
+                goto Exit;
             }
         }
-
-        pPatchedApiArray = pPatchedApiArray->Next;
     }
 
-    return NULL;
-}
+Exit:
 
-
-/*++
-
-Routine Name:
-
-    GetFuncNameAt
-
-Routine Description:
-
-    Returns the name of a patched function at given index
-
-Return:
-
-    Function name
-
---*/
-LPCSTR
-C_PATCH_MANAGER::GetFuncNameAt(
-    ULONG inIndex)
-{
-    //IHU_DBG_ASSERT(inIndex < mPatchedApiCount);
-
-    ULONG tableIndex = inIndex / M_HOOK_ENTRY_CHUNK_SIZE;
-    ULONG entryIndex = inIndex % M_HOOK_ENTRY_CHUNK_SIZE;
-
-    IHI_PATCHED_API_DATA *patchedApiArray = GetPatchedApiArrayAt(tableIndex);
-
-    return patchedApiArray->mApiData[entryIndex].mApiName;
+    return result;
 }
 
 
 void
-C_PATCH_MANAGER::GetReturnDataAt(
-    ULONG   inIndex,
-    IHI_RETURN_DATA &oReturnData)
-/*++
-
-Routine Description:
-
-    Copies the Return Data information about the function at given index
-    in the output variable
-
-Return:
-
-    none
-
---*/
-{
-    //IHU_DBG_ASSERT(inIndex < mPatchedApiCount);
-
-    ULONG tableIndex = inIndex / M_HOOK_ENTRY_CHUNK_SIZE;
-    ULONG entryIndex = inIndex % M_HOOK_ENTRY_CHUNK_SIZE;
-
-    IHI_PATCHED_API_DATA *patchedApiArray = GetPatchedApiArrayAt(tableIndex);
-
-    oReturnData = patchedApiArray->mApiData[entryIndex].mReturnData;
-    return;
-}
-
-
-void
-C_PATCH_MANAGER::RemoveAllPatches()
-/*++
-
-Routine Description:
-
-    Remove all the patches from the process
-
-NOTE:
-    In our earlier design, we were freeing the memory allocated for the patches
-    here. This works fine for IAT patched functions, but the functions which we
-    patched dynamically by hooking GetProcAddress may still have the address to
-    our patch code and if we free this memory, we end up crashing the target.
-
-    Because RemoveAllPatches is mostly called when our DLL is getting unloaded
-    we either need to restore the original functions that we patched or we need
-    to modify our patches in such a way that they don't refer to our injector
-    DLL. We are not able to restore all the patches as described in the first
-    paragraph. So we simply fix the patch code to refer back to the original
-    function and we don't free any memory. The *not* freeing of memory should
-    not be a problem because in most cases as injector.dll is only unloaded
-    when the target program is exiting. When injector.dll is unloaded for some
-    other reason, then we would cause a small memory leak, but since the leak
-    is small, we can ignore it. (TODO: If this memory leak becomes too big a
-    problem, then can differentiate IAT patches from GetProcAddress patches and
-    selectively free memory allocated to IAT patches)
-
-    Initially our patch code is of the format
-    addr_x      CALL [addr32]
-    addr_y      api_index
-    addr_32     [address of ihiPatchProlog]
-
-    in our patch fixing to refer to original function, we convert it to
-    addr_x      JMP [addr32]
-    addr_y      api_index
-    addr_32     [address of Original function]
-
-Returns:
-
-    none
-
---*/
-{
-    if (mPatchesRemoved == false)
-    {
-        for (ULONG i = 0; i < mPatchedApiCount; ++i)
-        {
-            ULONG tableIndex = i / M_HOOK_ENTRY_CHUNK_SIZE;
-            ULONG entryIndex = i % M_HOOK_ENTRY_CHUNK_SIZE;
-
-            IHI_PATCHED_API_DATA *patchedApiArray = GetPatchedApiArrayAt(tableIndex);
-
-            IHI_API_DATA    *apiInfo    = &patchedApiArray->mApiData[entryIndex];
-            PATCH_CODE      *patchCode  = &patchedApiArray->mPatchCodeArray[entryIndex];
-
-            patchCode->Prolog.Call[1]   = 0x25;
-            patchCode->Prolog.dwAddress = (DWORD)(DWORD_PTR)apiInfo->mOriginalAddress;
-        }
-
-        mPatchesRemoved = true;
-    }
-}
-
-
-/*++
-
-Routine Name:
-
-    IsModulePatched
-
-Routine Description:
-
-    Finds whether a given module is already patched or
-    not.
-
-Return:
-
-    true - If the specified module is already patched
-    false - otherwise
-
---*/
-bool
-C_PATCH_MANAGER::IsModulePatched(
-    HANDLE inModuleHandle)
-{
-    bool bFound = false;
-
-    for (ULONG i = 0; i < mPatchedModuleCount; ++i)
-    {
-        if (mPatchedModuleList[i] == inModuleHandle)
-        {
-            bFound = true;
-            break;
-        }
-    }
-
-    return bFound;
-}
-
-
-/*++
-
-Routine Name:
-
-    AddModuleToPatchedList
-
-Routine Description:
-
-    Add a new module to the list of patched modules
-
-Return:
-
-    none
-
---*/
-void
-C_PATCH_MANAGER::AddModuleToPatchedList(
-    HANDLE inModuleHandle)
-{
-    if (!IsModulePatched(inModuleHandle))
-    {
-        if (mPatchedModuleCount < (IHI_MAX_MODULES - 1))
-        {
-            mPatchedModuleList[mPatchedModuleCount++] = inModuleHandle;
-        }
-    }
-}
-
-
-/*++
-
-Routine Name:
-
-    RemoveModuleFromPatchedList
-
-Routine Description:
-
-    Removes a module from the list of patched modules
-
-Return:
-
-    none
-
---*/
-void
-C_PATCH_MANAGER::RemoveModuleFromPatchedList(
-    HANDLE inModuleHandle)
-{
-    ULONG moduleIndex = 0;
-    ULONG i = 0;
-
-    for (   moduleIndex = 0;
-            moduleIndex < mPatchedModuleCount;
-            ++moduleIndex)
-    {
-        if (mPatchedModuleList[moduleIndex] == inModuleHandle)
-        {
-            break;
-        }
-    }
-
-    for (i = moduleIndex; i < mPatchedModuleCount; ++i)
-    {
-        mPatchedModuleList[i] = mPatchedModuleList[i+1];
-    }
-
-    mPatchedModuleList[i] = NULL;
-    --mPatchedModuleCount;
-}
-
-
-/*++
-
-Routine Name:
-
-    GetPatchedModulesHandle
-
-Routine Description:
-
-    Returns the handle of patched module
-    at the given index
-
-Return:
-
-    handle of patched module at given index
-    null if the index is out of bounds
-
---*/
-HANDLE
-C_PATCH_MANAGER::GetPatchedModulesHandle(
-    ULONG moduleIndex)
-{
-    if (moduleIndex < mPatchedModuleCount)
-    {
-        return mPatchedModuleList[moduleIndex];
-    }
-
-    return NULL;
-}
-
-
-/*++
-
-Routine Name:
-
-    GetPatchedModulesCount
-
-Routine Description:
-
-    Returns the total number of patched modules
-
-Return:
-
-    count of patched modules
-
---*/
-ULONG
-C_PATCH_MANAGER::GetPatchedModulesCount()
-{
-    return mPatchedModuleCount;
-}
-
-
-/*++
-
-Routine Name:
-
-    C_PATCH_INCL_EXCL_MGR
-
-Routine Description:
-
-    Constructs a Patch Inclusion/Exclusion manager
-
---*/
-C_PATCH_INCL_EXCL_MGR::C_PATCH_INCL_EXCL_MGR()
-{
-    m_IncludeList = NULL;
-    m_ExcludeList = NULL;
-}
-
-
-/*++
-
-Routine Name:
-
-    ~C_PATCH_INCL_EXCL_MGR
-
-Routine Description:
-
-    Destructs a Patch Inclusion/Exclusion manager
-
---*/
-C_PATCH_INCL_EXCL_MGR::~C_PATCH_INCL_EXCL_MGR()
-{
-    PIHI_MAP pCurrent;
-
-    pCurrent = m_IncludeList;
-
-    while(pCurrent)
-    {
-        PIHI_MAP pChildCurrent = (PIHI_MAP)pCurrent->Value;
-
-        while(pChildCurrent)
-        {
-            IHI_RETURN_DATA *pReturnData = (IHI_RETURN_DATA *)pChildCurrent->Value;
-            delete pReturnData;
-
-            PIHI_MAP pChildTemp = pChildCurrent;
-            pChildCurrent = pChildCurrent->Next;
-            delete pChildTemp;
-        }
-
-        PIHI_MAP pTemp = pCurrent;
-        pCurrent = pCurrent->Next;
-        delete pTemp;
-    }
-
-    pCurrent = m_ExcludeList;
-
-    while(pCurrent)
-    {
-        PIHI_MAP pChildCurrent = (PIHI_MAP)pCurrent->Value;
-
-        while(pChildCurrent)
-        {
-            //
-            // Excluded list doesn't have return value information
-            //
-            PIHI_MAP pChildTemp = pChildCurrent;
-            pChildCurrent = pChildCurrent->Next;
-            delete pChildTemp;
-        }
-
-        PIHI_MAP pTemp = pCurrent;
-        pCurrent = pCurrent->Next;
-        delete pTemp;
-    }
-}
-
-void
-DumpMap(PIHI_MAP inMap, LPCWSTR inTitle)
+ihiMapDump(PIHI_MAP inMap, LPCWSTR inTitle)
 {
     IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"**** DUMPING %s MAP ****\n", inTitle);
     for (IHI_MAP *pCurrent = inMap; pCurrent; pCurrent = pCurrent->Next)
@@ -774,455 +336,6 @@ DumpMap(PIHI_MAP inMap, LPCWSTR inTitle)
             }
         }
     }
-}
-
-
-/*++
-
-Routine Name:
-
-    SetInclExclList
-
-Routine Description:
-
-    This function is used to set the inclusion and exclusion
-    list of Functions.
-
-Return:
-
-    none
-
---*/
-void
-C_PATCH_INCL_EXCL_MGR::SetInclExclList(
-    LPCSTR  inFnIncludes,
-    LPCSTR  inFnExcludes)
-{
-    //
-    // Hardcoded exclusion for problem causing modules.
-    //
-    std::string fixedExcludes;
-    fixedExcludes = "<msvc*:*:*><*:ntdll.dll:*><*:msvc*:*><*:mfc*:*><*:api-ms-win*:*>";
-    BuildInclOrExclList(fixedExcludes, &m_ExcludeList);
-
-    //
-    // User provided include/exclude.
-    //
-    std::string     fnIncList = inFnIncludes;
-    std::string     fnExcList = inFnExcludes;
-
-    BuildInclOrExclList(fnIncList, &m_IncludeList);
-    BuildInclOrExclList(fnExcList, &m_ExcludeList);
-
-    DumpMap(m_IncludeList, L"INCLUDE");
-    DumpMap(m_ExcludeList, L"EXCLUDE");
-}
-
-
-/*++
-
-Routine Name:
-
-    BuildInclOrExclList
-
-Routine Description:
-
-    Parses the inclusion or exclusion list given in the format
-    <loaded_module:imp_module:fn_name> and builds the map data
-    structure for htat
-
-Return:
-
-    none
-
---*/
-void
-C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
-    std::string         inFnList,
-    PIHI_MAP            *ioMap)
-{
-    // Start from second character as first character will be <
-    int index_begin = 1;
-
-    int index_end = 0;
-
-    while (true)
-    {
-        index_end = inFnList.find_first_of('>', index_begin);
-
-        if (index_end == -1)
-        {
-            break;
-        }
-
-        std::string fnInc = inFnList.substr(index_begin, index_end - index_begin);
-
-        int i_begin = 0;
-        int i_end = 0;
-        do
-        {
-            std::string     loadedModule;
-            std::string     impModule;
-            std::string     fnName;
-            std::string     retValStr;
-            IHI_RETURN_DATA retValInfo = {0};
-
-            i_end = fnInc.find_first_of(':', i_begin);
-
-            if (i_end == -1)
-            {
-                // incorrect format, required : missing
-                break;
-            }
-
-            loadedModule = fnInc.substr(i_begin, i_end - i_begin);
-
-            if (loadedModule.compare(".") == 0)
-            {
-                loadedModule = g_MainExeName;
-            }
-
-            i_begin = i_end + 1;
-
-            i_end = fnInc.find_first_of(':', i_begin);
-
-            if (i_end == -1)
-            {
-                // incorrect format, required : missing
-                break;
-            }
-
-            impModule = fnInc.substr(i_begin, i_end - i_begin);
-
-            i_begin = i_end + 1;
-
-            i_end = fnInc.find_first_of('=', i_begin);
-
-            if (i_end == -1)
-            {
-                fnName = fnInc.substr(i_begin, fnInc.length() - i_begin);
-            }
-            else
-            {
-                fnName = fnInc.substr(i_begin, i_end - i_begin);
-
-                i_begin = i_end + 1;
-
-                if (i_begin < (int)fnInc.length())
-                {
-                    // a return value is specified
-                    retValStr = fnInc.substr(i_begin, fnInc.length() - i_begin);
-
-                    retValInfo.Specified    = true;
-                    retValInfo.Value        = (int)strtoul(retValStr.c_str(), NULL, 0);
-                }
-            }
-
-            if (loadedModule.empty() || impModule.empty() || fnName.empty())
-            {
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
-                    L"Ignoring invalid include/exclude list: %S\n",
-                    fnInc.c_str());
-            }
-            
-            if (*loadedModule.rbegin() == '*')
-            {
-                loadedModule.pop_back();
-            }
-
-            if (*impModule.rbegin() == '*')
-            {
-                impModule.pop_back();
-            }
-
-            if (*fnName.rbegin() == '*')
-            {
-                fnName.pop_back();
-            }
-
-            PIHI_MAP            *pImpModuleMap  = NULL;
-            PIHI_MAP            *pFnNameMap     = NULL;
-            IHI_RETURN_DATA     *pReturnData    = NULL;
-
-            //
-            // Create loaded module entry if it does not exist.
-            //
-            if (!ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), (LPVOID*)&pImpModuleMap, false))
-            {
-                if (!ihiMapAssign(ioMap, (LPCSTR)loadedModule.c_str(), NULL))
-                {
-                    return;
-                }
-            }
-
-            //
-            // Create import module entry if it does not exist.
-            //
-            ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), (LPVOID*)&pImpModuleMap, false);
-
-            if (!ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), (LPVOID*)&pFnNameMap, false))
-            {
-                if (!ihiMapAssign(pImpModuleMap, (LPCSTR)impModule.c_str(), NULL))
-                {
-                    return;
-                }
-            }
-
-            //
-            // Create function name entry if it does not exist.
-            //
-            ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), (LPVOID*)&pFnNameMap, false);
-
-            if (!ihiMapFind(*pFnNameMap, (LPCSTR)fnName.c_str(), (LPVOID*)&pReturnData, false))
-            {
-                pReturnData = NULL;
-
-                if (retValInfo.Specified)
-                {
-                    pReturnData = new IHI_RETURN_DATA;
-
-                    if (pReturnData == NULL)
-                    {
-                        return;
-                    }
-
-                    memset(pReturnData, 0, sizeof(IHI_RETURN_DATA));
-                    *pReturnData = retValInfo;
-                }
-
-                if (!ihiMapAssign(pFnNameMap, (LPCSTR)fnName.c_str(), pReturnData))
-                {
-                    return;
-                }
-            }
-        } while(false);
-
-        index_begin = index_end + 2;
-    }
-}
-
-
-//
-// TODO
-// We need better inclusion/exclusion management code
-// The concept i am using is fine but the implementation is
-// not very good. Since this is not a critical piece of code
-// this should be acceptable for now
-//
-
-bool
-C_PATCH_INCL_EXCL_MGR::PatchRequired(
-    LPCSTR      inLoadedModuleName,
-    LPCSTR      inImpModuleName,
-    LPCSTR      inFnName,
-    bool        inOrdinalExport,
-    IHI_RETURN_DATA *oRetVal)
-/*++
-
-Routine Description:
-
-    This routine checks if a function should be patched or not, based on the
-    exclusion/inclusion list.
-
-Arguments:
-
-    inLoadedModuleName - The module which is calling the function
-
-    inImpModuleName - The module which implements the function
-
-    inFnName - Name of the function (for functions exported by ordinal
-        this name is Ord%x)
-
-    inOrdinalExport - Was the function exported by ordinal
-
-    oRetVal - Return value information if a different return value is
-        specified by the user
-
-Return:
-
-    true - Patching required
-    false - Don't patch
-
---*/
-{
-    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD,
-        L"IsPatchRequired for: %S, %S, %S\n",
-        inLoadedModuleName, inImpModuleName, inFnName);
-
-    bool funcResult = false;
-    int inclWeight = 0;
-    int exclWeight = 0;
-
-    inclWeight = CalcWeight(
-                        m_IncludeList,
-                        inLoadedModuleName,
-                        inImpModuleName,
-                        inFnName,
-                        oRetVal);
-
-    exclWeight = CalcWeight(
-                        m_ExcludeList,
-                        inLoadedModuleName,
-                        inImpModuleName,
-                        inFnName,
-                        NULL);
-
-    if ((inclWeight == 0 && exclWeight == 0) ||
-        (exclWeight < inclWeight))
-    {
-        funcResult = true;
-    }
-    else
-    {
-        funcResult = false;
-    }
-
-    if (funcResult)
-    {
-        if (inFnName != NULL)
-        {
-            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
-                L"Patching Function: %S->%S:%S\n",
-                inLoadedModuleName,
-                inImpModuleName,
-                inFnName);
-        }
-    }
-
-    return funcResult;
-}
-
-
-int
-C_PATCH_INCL_EXCL_MGR::CalcFnMatchWeight(
-    PIHI_MAP inFnMap,
-    LPCSTR inFnName,
-    LPVOID *oReturnData)
-{
-    int fnWeight = 0;
-
-    if (ihiMapFind(inFnMap, inFnName, oReturnData, false))
-    {
-        fnWeight = 4;
-    }
-    else if (ihiMapFind(inFnMap, inFnName, oReturnData, true))
-    {
-        fnWeight = 1;
-    }
-
-    return fnWeight;
-}
-
-int
-C_PATCH_INCL_EXCL_MGR::CalcImpModuleMatchWeight(
-    PIHI_MAP inImpModuleMap,
-    LPCSTR inImpModuleName,
-    LPCSTR inFnName,
-    LPVOID *oReturnData)
-{
-    PIHI_MAP *pFnNameMap;
-    int impModuleWeight = 0;
-    int fnWeight = 0;
-
-    if (ihiMapFind(inImpModuleMap, inImpModuleName, (LPVOID*)&pFnNameMap, false))
-    {
-        impModuleWeight = 3;
-        fnWeight = CalcFnMatchWeight(*pFnNameMap, inFnName, oReturnData);
-    }
-
-    if (impModuleWeight == 0 || fnWeight == 0)
-    {
-        if (ihiMapFind(inImpModuleMap, inImpModuleName, (LPVOID*)&pFnNameMap, true))
-        {
-            impModuleWeight = 1;
-            fnWeight = CalcFnMatchWeight(*pFnNameMap, inFnName, oReturnData);
-        }
-    }
-
-    if (impModuleWeight == 0 || fnWeight == 0)
-    {
-        return 0;
-    }
-
-    return impModuleWeight + fnWeight;
-}
-
-int
-C_PATCH_INCL_EXCL_MGR::CalcWeight(
-    PIHI_MAP            inLoadedModuleMap,
-    LPCSTR              inLoadedModuleName,
-    LPCSTR              inImpModuleName,
-    LPCSTR              inFnName,
-    IHI_RETURN_DATA     *oRetVal)
-/*++
-
-Routine Description:
-
-    Calculates the weight of a match. We weigh each exact match as 2 and
-    each generic match as 1. All the possible combinations are explored to
-    find the best match. This is more like a directed graph problem.
-
-Arguments:
-
-    inLoadedModuleName - The module which is calling the function
-
-    inImpModuleName - The module which implements the function
-
-    inFnName - Name of the function (for functions exported by ordinal
-        this name is Ord%x)
-
-    oRetVal - Optional return value information for the best match
-
-    inLoadedModuleMap - reference to the map (or graph) for either included
-        functions or excluded functions
-
-Return:
-
-    int - a number representing the weight of the function
-
---*/
-{   
-    PIHI_MAP *pImpModuleMap;
-    PIHI_RETURN_DATA *pReturnData;
-    int loadedModuleWeight = 0;
-    int impModuleWeight = 0;
-
-    if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, (LPVOID*)&pImpModuleMap, false))
-    {
-        loadedModuleWeight = 2;
-        impModuleWeight = CalcImpModuleMatchWeight(*pImpModuleMap, inImpModuleName, inFnName, (LPVOID*)&pReturnData);
-    }
-
-    if (loadedModuleWeight == 0 || impModuleWeight == 0)
-    {
-        if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, (LPVOID*)&pImpModuleMap, true))
-        {
-            loadedModuleWeight = 1;
-            impModuleWeight = CalcImpModuleMatchWeight(*pImpModuleMap, inImpModuleName, inFnName, (LPVOID*)&pReturnData);
-        }
-    }
-
-    if (loadedModuleWeight == 0 || impModuleWeight == 0)
-    {
-        return 0;
-    }
-
-#if 0
-    if (loadedModuleWeight > 0 || impModuleWeight > 0)
-    {
-        if (oRetVal && *pReturnData)
-        {
-            *oRetVal = **pReturnData;
-        }
-    }
-#endif
-
-    if (oRetVal && *pReturnData)
-    {
-        *oRetVal = **pReturnData;
-    }
-
-    return loadedModuleWeight + impModuleWeight;
 }
 
 

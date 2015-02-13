@@ -217,6 +217,21 @@ typedef struct _IHI_PATCHED_API_DATA
 
 
 //
+// Utilities to handle PE image's import/export tables.
+//
+LPVOID ihiGetPtrFromRVA(DWORD relVA, PIMAGE_NT_HEADERS inINTH,
+    DWORD inBaseAddress);
+
+BOOL ihiGetFileImportDescriptor(LPCWSTR fileName, PIMAGE_NT_HEADERS *INTHPtr,
+    PIMAGE_IMPORT_DESCRIPTOR *IIDPtr, PBYTE *BaseAddress);
+
+BOOL ihiGetModuleImportDescriptor(PBYTE inModuleBaseAddress, LPCSTR inModuleBaseName,
+    PIMAGE_NT_HEADERS *INTHPtr, PIMAGE_IMPORT_DESCRIPTOR *IIDPtr);
+
+BOOL ihiGetExportedFunctionName(LPCWSTR inModuleName, WORD inOrdinal,
+    LPSTR outFnName, DWORD inFnNameSize);
+
+//
 // Data structures to manage inclusion/exclusion of functions
 //
 struct _IHI_MAP;
@@ -229,6 +244,9 @@ typedef struct _IHI_MAP
     struct _IHI_MAP     *Next;
 
 }IHI_MAP, *PIHI_MAP;
+
+void
+ihiMapDump(PIHI_MAP inMap, LPCWSTR inTitle); 
 
 bool
 ihiMapFind(

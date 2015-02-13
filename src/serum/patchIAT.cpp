@@ -28,10 +28,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /*++
 
-Module Name:
-
-    patchIAT.cpp
-
 Module Description:
 
     Implements core IAT patching functionality for patching functions
@@ -61,40 +57,7 @@ C_PATCH_INCL_EXCL_MGR gPatchInclExclMgr;
 
 
 typedef enum _PROCESSINFOCLASS {
-    ProcessBasicInformation,
-    ProcessQuotaLimits,
-    ProcessIoCounters,
-    ProcessVmCounters,
-    ProcessTimes,
-    ProcessBasePriority,
-    ProcessRaisePriority,
-    ProcessDebugPort,
-    ProcessExceptionPort,
-    ProcessAccessToken,
-    ProcessLdtInformation,
-    ProcessLdtSize,
-    ProcessDefaultHardErrorMode,
-    ProcessIoPortHandlers,
-    ProcessPooledUsageAndLimits,
-    ProcessWorkingSetWatch,
-    ProcessUserModeIOPL,
-    ProcessEnableAlignmentFaultFixup,
-    ProcessPriorityClass,
-    ProcessWx86Information,
-    ProcessHandleCount,
-    ProcessAffinityMask,
-    ProcessPriorityBoost,
-    ProcessDeviceMap,
-    ProcessSessionInformation,
-    ProcessForegroundInformation,
-    ProcessWow64Information,
-    ProcessImageFileName,
-    ProcessLUIDDeviceMapsEnabled,
-    ProcessBreakOnTermination,
-    ProcessDebugObjectHandle,
-    ProcessDebugFlags,
-    ProcessHandleTracing,
-    MaxProcessInfoClass
+    ProcessDebugPort = 7,
 } PROCESSINFOCLASS;
 
 /*++
@@ -621,271 +584,6 @@ ihiPatchedFuncEntry(
 #pragma optimize("g", on)
 #pragma check_stack(on)
 
-PIMAGE_SECTION_HEADER GetEnclosingSectionHeader(DWORD rva,
-    PIMAGE_NT_HEADERS pNTHeader)
-{
-    PIMAGE_SECTION_HEADER section = IMAGE_FIRST_SECTION(pNTHeader);
-    unsigned i;
-
-    for (i = 0; i < pNTHeader->FileHeader.NumberOfSections; i++, section++)
-    {
-        // Is the RVA within this section?
-        if ((rva >= section->VirtualAddress) &&
-            (rva < (section->VirtualAddress + section->Misc.VirtualSize)))
-            return section;
-    }
-
-    return 0;
-}
-
-LPVOID GetPtrFromRVA(DWORD rva, PIMAGE_NT_HEADERS pNTHeader, DWORD imageBase)
-{
-    PIMAGE_SECTION_HEADER pSectionHdr;
-    INT delta;
-
-    pSectionHdr = GetEnclosingSectionHeader(rva, pNTHeader);
-    if (!pSectionHdr)
-        return 0;
-
-    delta = (INT)(pSectionHdr->VirtualAddress - pSectionHdr->PointerToRawData);
-    return (PVOID)(imageBase + rva - delta);
-}
-
-
-LPBYTE ihiCreateFileMapping(LPCWSTR fileName)
-{
-    HANDLE hFile;
-    HANDLE hFileMapping;
-    LPBYTE lpFileBase;
-
-    lpFileBase = NULL;
-
-    hFile = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL,
-        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-
-    if (hFile == INVALID_HANDLE_VALUE)
-    {
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Couldn't open file with CreateFile()\n");
-        goto Exit;
-    }
-
-    hFileMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
-    if (hFileMapping == 0)
-    {
-        CloseHandle(hFile);
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Couldn't open file mapping with CreateFileMapping()\n");
-        goto Exit;
-    }
-
-    lpFileBase = (LPBYTE)MapViewOfFile(hFileMapping, FILE_MAP_READ, 0, 0, 0);
-    if (lpFileBase == NULL)
-    {
-        CloseHandle(hFileMapping);
-        CloseHandle(hFile);
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Couldn't map view of file with MapViewOfFile()\n");
-        goto Exit;
-    }
- 
-Exit:
-    return lpFileBase;
-}
-
-
-BOOL ihiGetFileImportDescriptor(LPCWSTR fileName, PIMAGE_NT_HEADERS *INTHPtr, PIMAGE_IMPORT_DESCRIPTOR *IIDPtr, PBYTE *BaseAddress)
-{
-    LPBYTE lpFileBase;
-    PIMAGE_DOS_HEADER pIDH;
-    PIMAGE_NT_HEADERS pINTH = NULL;
-    PIMAGE_IMPORT_DESCRIPTOR pIID = NULL;
-    DWORD importTableRVA;
-    BOOL result;
-
-    result = FALSE;
-
-    lpFileBase = ihiCreateFileMapping(fileName);
-    if (lpFileBase == NULL)
-    {
-        goto Exit;
-    }
-
-    pIDH = (PIMAGE_DOS_HEADER)lpFileBase;
-    if (pIDH->e_magic == IMAGE_DOS_SIGNATURE)
-    {
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Module for file %s is PE format.\n", fileName);
-        pINTH = (PIMAGE_NT_HEADERS)(lpFileBase + pIDH->e_lfanew);
-        importTableRVA = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-        if (importTableRVA == 0)
-        {
-            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
-                L"PatchFailure: No Import Table Offset for module: %s.\n",
-                fileName);
-            goto Exit;
-        }
-        // pIID = (PIMAGE_IMPORT_DESCRIPTOR)(lpFileBase + importTableRVA);
-        pIID = (PIMAGE_IMPORT_DESCRIPTOR)GetPtrFromRVA(importTableRVA, pINTH, (DWORD)lpFileBase);
-#if 0
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Here3. %d\n", pIID->OriginalFirstThunk);
-        if (pIID->OriginalFirstThunk != 0)
-        {
-            // pIINA = (PIMAGE_THUNK_DATA)(lpFileBase + (DWORD)pIID->OriginalFirstThunk);
-            // Adjust the pointer to point where the tables are in the
-            // mem mapped file.
-            pIINA = (PIMAGE_THUNK_DATA)GetPtrFromRVA((DWORD)pIID->OriginalFirstThunk, pINTH, lpFileBase);
-        }
-#endif
-    }
-    else
-    {
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"unrecognized file format for file: %s\n", fileName);
-        goto Exit;
-    }
-
-    result = TRUE;
-
-Exit:
-    *INTHPtr = pINTH;
-    *IIDPtr = pIID;
-    *BaseAddress = lpFileBase;
-    return result;
-}
-
-
-BOOL
-ihiGetModuleImportDescriptor(PBYTE inModuleBaseAddress, LPCSTR inModuleBaseName, PIMAGE_NT_HEADERS *INTHPtr, PIMAGE_IMPORT_DESCRIPTOR *IIDPtr)
-{
-    PIMAGE_DOS_HEADER           pIDH;
-    PIMAGE_NT_HEADERS           pINTH;
-    PIMAGE_IMPORT_DESCRIPTOR    pIID;
-    DWORD                       importTableRVA;
-    BOOL result;
-
-    pINTH = NULL;
-    pIID = NULL;
-    result = FALSE;
-
-    pIDH = (PIMAGE_DOS_HEADER)inModuleBaseAddress;
-    if (IsBadReadPtr(inModuleBaseAddress, sizeof(IMAGE_DOS_HEADER)))
-    {
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
-            L"PatchFailure: Unable to read IMAGE_DOS_HEADER for module: %S.\n",
-            inModuleBaseName);
-        goto Exit;
-    }
-    pINTH = (PIMAGE_NT_HEADERS)(inModuleBaseAddress + pIDH->e_lfanew);
-    importTableRVA = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-    if (importTableRVA == 0)
-    {
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
-            L"PatchFailure: No Import Table Offset for module: %S.\n",
-            inModuleBaseName);
-        goto Exit;
-    }
-    pIID = (PIMAGE_IMPORT_DESCRIPTOR)(inModuleBaseAddress + importTableRVA);
-    result = TRUE;
-
-Exit:
-
-    *INTHPtr = pINTH;
-    *IIDPtr = pIID;
-    return result;
-}
-
-BOOL
-ihiGetExportedFunctionName(LPCWSTR inModuleName, WORD inOrdinal, LPSTR outFnName, DWORD inFnNameSize)
-{
-    wchar_t fileName[MAX_PATH + 1];
-    HMODULE modHandle;
-    LPBYTE lpFileBase;
-    PIMAGE_DOS_HEADER pIDH;
-    PIMAGE_NT_HEADERS pINTH = NULL;
-    PIMAGE_EXPORT_DIRECTORY pIED;
-    DWORD exportTableRVA;
-    LPSTR* pNames;
-    PWORD pOrdinals;
-    BOOL result;
-    DWORD i;
-
-    result = FALSE;
-    
-    modHandle = GetModuleHandle(inModuleName);
-    if (modHandle == NULL)
-    {
-        goto Exit;
-    }
-
-    fileName[MAX_PATH] = L'\0';
-    if (!GetModuleFileName(modHandle, fileName, MAX_PATH))
-    {
-        goto Exit;
-    }
-
-    lpFileBase = ihiCreateFileMapping(fileName);
-    if (lpFileBase == NULL)
-    {
-        goto Exit;
-    }
-
-    pIDH = (PIMAGE_DOS_HEADER)lpFileBase;
-    if (pIDH->e_magic == IMAGE_DOS_SIGNATURE)
-    {
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Module for file %s is PE format.\n", fileName);
-        pINTH = (PIMAGE_NT_HEADERS)(lpFileBase + pIDH->e_lfanew);
-        exportTableRVA = pINTH->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-        if (exportTableRVA == 0)
-        {
-            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
-                L"PatchFailure: No Export Table Offset for module: %s.\n",
-                fileName);
-            goto Exit;
-        }
-        pIED = (PIMAGE_EXPORT_DIRECTORY)GetPtrFromRVA(exportTableRVA, pINTH, (DWORD)lpFileBase);
-        if (pIED == NULL)
-        {
-            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
-                L"PatchFailure: Unable to find Export Table for module: %s.\n",
-                fileName);
-            goto Exit;
-        }
-        pOrdinals = (PWORD)GetPtrFromRVA(pIED->AddressOfNameOrdinals, pINTH, (DWORD)lpFileBase);
-        pNames = (LPSTR*)GetPtrFromRVA(pIED->AddressOfNames, pINTH, (DWORD)lpFileBase);
-        if (pOrdinals == NULL || pNames == NULL)
-        {
-            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Name or Ordinal Array is NULL\n");
-            goto Exit;
-        }
-        for (i = 0; i < pIED->NumberOfNames; i++)
-        {
-            
-            WORD ordinal = pOrdinals[i] + (WORD)pIED->Base;
-            if (_IhuDbgLogLevel <= IHU_LEVEL_FLOOD)
-            {
-                LPSTR name = (LPSTR)GetPtrFromRVA((DWORD)pNames[i], pINTH, (DWORD)lpFileBase);
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FLOOD, L"Ordinal: %x\n", ordinal);
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FLOOD, L"Name: %S\n", name);
-            }
-            if (ordinal == inOrdinal)
-            {
-                LPSTR name = (LPSTR)GetPtrFromRVA((DWORD)pNames[i], pINTH, (DWORD)lpFileBase);
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Ordinal: %x\n", ordinal);
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Name: %S\n", name);
-                if (strlen(name) < inFnNameSize)
-                {
-                    strcpy(outFnName, name);
-                    result = TRUE;
-                }
-                else
-                {
-                    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR, L"Failed to copy exported function name - supplied buffer is smaller.\n");
-                }
-                goto Exit;
-            }
-        }
-    }
-
-Exit:
-
-    return result;
-}
 
 /*++
 
@@ -1003,7 +701,7 @@ ihiPatchUnpatchImports(
                 break;
             }
 
-            pIINA = (PIMAGE_THUNK_DATA)GetPtrFromRVA(pIID_File->FirstThunk, pINTH_File, (DWORD)moduleBaseAddress_File);
+            pIINA = (PIMAGE_THUNK_DATA)ihiGetPtrFromRVA(pIID_File->FirstThunk, pINTH_File, (DWORD)moduleBaseAddress_File);
             if (pIINA == NULL)
             {
                 IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
@@ -1050,7 +748,7 @@ ihiPatchUnpatchImports(
                         }
                         else
                         {
-                            pIIN = (PIMAGE_IMPORT_BY_NAME)GetPtrFromRVA((DWORD)pIINA->u1.AddressOfData, pINTH_File, (DWORD)moduleBaseAddress_File);
+                            pIIN = (PIMAGE_IMPORT_BY_NAME)ihiGetPtrFromRVA((DWORD)pIINA->u1.AddressOfData, pINTH_File, (DWORD)moduleBaseAddress_File);
                         }
                         fnName = (LPSTR)pIIN->Name;
                     }

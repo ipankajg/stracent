@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\serum\patchIAT.cpp" />
+    <ClCompile Include="..\src\serum\patchmgr.cpp" />
     <ClCompile Include="..\src\serum\patchutl.cpp" />
     <ClCompile Include="..\src\serum\serum.cpp" />
   </ItemGroup>
