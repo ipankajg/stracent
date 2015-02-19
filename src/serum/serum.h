@@ -47,7 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ihulib.h"
 
 #define TRC_PATCHIAT IHU_LOGGING_ON
-#define TRC_INJECTOR IHU_LOGGING_OFF
+#define TRC_INJECTOR IHU_LOGGING_ON
 
 using namespace std;
 
@@ -248,19 +248,27 @@ typedef struct _IHI_MAP
 void
 ihiMapDump(PIHI_MAP inMap, LPCWSTR inTitle); 
 
+enum IHI_PREFIX_MATCH_MODE
+{
+    MATCH_EXACT,
+    MATCH_GREEDY
+};
+
 bool
 ihiMapFind(
     IHI_MAP     *inMap,
     LPCSTR      inKey,
+    bool        inDoPrefixMatch,
+    IHI_PREFIX_MATCH_MODE inMatchMode,
     LPVOID      *oValue,
-    bool        inDoPrefixMatch);
+    PULONG      oMatchValue);
 
 
 bool
-ihiMapAssign(
-    PIHI_MAP *ioMap,
-    LPCSTR inKey,
-    LPVOID inValue);
+ihiMapAssign(PIHI_MAP *ioMap, LPCSTR inKey, bool inIsPrefix, LPVOID inValue);
+
+VOID
+ihiDisableAntiDebugMeasures();
 
 
 //
@@ -399,7 +407,7 @@ public:
         bool            inOrdinalExport,
         IHI_RETURN_DATA *oRetVal);
 
-    int
+    ULONG
         CalcWeight(
         PIHI_MAP            inLoadedModuleMap,
         LPCSTR              inLoadedModuleName,
@@ -407,13 +415,13 @@ public:
         LPCSTR              inFnName,
         IHI_RETURN_DATA     *oRetVal);
 
-    int
+    ULONG
         CalcFnMatchWeight(
         PIHI_MAP inFnMap,
         LPCSTR inFnName,
         LPVOID *oReturnData);
 
-    int
+    ULONG
         CalcImpModuleMatchWeight(
         PIHI_MAP inImpModuleMap,
         LPCSTR inImpModuleName,

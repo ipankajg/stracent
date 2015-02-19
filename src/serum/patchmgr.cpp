@@ -770,6 +770,9 @@ C_PATCH_INCL_EXCL_MGR::SetInclExclList(
     //
     std::string fixedExcludes;
     fixedExcludes = "<msvc*:*:*><*:ntdll.dll:*><*:msvc*:*><*:mfc*:*><*:api-ms-win*:*>";
+    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+        L"Adding hardcoded excludes: %S\n",
+        fixedExcludes.c_str());
     BuildInclOrExclList(fixedExcludes, &m_ExcludeList);
 
     //
@@ -778,7 +781,13 @@ C_PATCH_INCL_EXCL_MGR::SetInclExclList(
     std::string     fnIncList = inFnIncludes;
     std::string     fnExcList = inFnExcludes;
 
+    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+        L"Adding user includes: %S\n",
+        fnIncList.c_str());
     BuildInclOrExclList(fnIncList, &m_IncludeList);
+    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+        L"Adding user excludes: %S\n",
+        fnExcList.c_str());
     BuildInclOrExclList(fnExcList, &m_ExcludeList);
 
     ihiMapDump(m_IncludeList, L"INCLUDE");
@@ -831,8 +840,15 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
             std::string     loadedModule;
             std::string     impModule;
             std::string     fnName;
+            bool loadedModuleIsPrefix;
+            bool impModuleIsPrefix;
+            bool fnNameIsPrefix;
             std::string     retValStr;
             IHI_RETURN_DATA retValInfo = {0};
+
+            loadedModuleIsPrefix = false;
+            impModuleIsPrefix = false;
+            fnNameIsPrefix = false;
 
             i_end = fnInc.find_first_of(':', i_begin);
 
@@ -895,16 +911,19 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
             if (*loadedModule.rbegin() == '*')
             {
                 loadedModule.pop_back();
+                loadedModuleIsPrefix = true;
             }
 
             if (*impModule.rbegin() == '*')
             {
                 impModule.pop_back();
+                impModuleIsPrefix = true;
             }
 
             if (*fnName.rbegin() == '*')
             {
                 fnName.pop_back();
+                fnNameIsPrefix = true;
             }
 
             PIHI_MAP            *pImpModuleMap  = NULL;
@@ -914,9 +933,9 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
             //
             // Create loaded module entry if it does not exist.
             //
-            if (!ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), (LPVOID*)&pImpModuleMap, false))
+            if (!ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, MATCH_EXACT, (LPVOID*)&pImpModuleMap, NULL))
             {
-                if (!ihiMapAssign(ioMap, (LPCSTR)loadedModule.c_str(), NULL))
+                if (!ihiMapAssign(ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, NULL))
                 {
                     return;
                 }
@@ -925,11 +944,11 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
             //
             // Create import module entry if it does not exist.
             //
-            ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), (LPVOID*)&pImpModuleMap, false);
+            ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, MATCH_EXACT, (LPVOID*)&pImpModuleMap, NULL);
 
-            if (!ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), (LPVOID*)&pFnNameMap, false))
+            if (!ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, MATCH_EXACT, (LPVOID*)&pFnNameMap, NULL))
             {
-                if (!ihiMapAssign(pImpModuleMap, (LPCSTR)impModule.c_str(), NULL))
+                if (!ihiMapAssign(pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, NULL))
                 {
                     return;
                 }
@@ -938,9 +957,9 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
             //
             // Create function name entry if it does not exist.
             //
-            ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), (LPVOID*)&pFnNameMap, false);
+            ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, MATCH_EXACT, (LPVOID*)&pFnNameMap, NULL);
 
-            if (!ihiMapFind(*pFnNameMap, (LPCSTR)fnName.c_str(), (LPVOID*)&pReturnData, false))
+            if (!ihiMapFind(*pFnNameMap, (LPCSTR)fnName.c_str(), fnNameIsPrefix, MATCH_EXACT, (LPVOID*)&pReturnData, NULL))
             {
                 pReturnData = NULL;
 
@@ -957,7 +976,7 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
                     *pReturnData = retValInfo;
                 }
 
-                if (!ihiMapAssign(pFnNameMap, (LPCSTR)fnName.c_str(), pReturnData))
+                if (!ihiMapAssign(pFnNameMap, (LPCSTR)fnName.c_str(), fnNameIsPrefix, pReturnData))
                 {
                     return;
                 }
@@ -1034,8 +1053,11 @@ Return:
                         inFnName,
                         NULL);
 
-    if ((inclWeight == 0 && exclWeight == 0) ||
-        (exclWeight < inclWeight))
+    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD,
+        L"IsPatchRequired InclWeight: %x, ExclWeight: %x\n",
+        inclWeight, exclWeight);
+
+    if (exclWeight <= inclWeight)
     {
         funcResult = true;
     }
@@ -1060,27 +1082,23 @@ Return:
 }
 
 
-int
+ULONG
 C_PATCH_INCL_EXCL_MGR::CalcFnMatchWeight(
     PIHI_MAP inFnMap,
     LPCSTR inFnName,
     LPVOID *oReturnData)
 {
-    int fnWeight = 0;
+    ULONG fnWeight = 0;
 
-    if (ihiMapFind(inFnMap, inFnName, oReturnData, false))
+    if (!ihiMapFind(inFnMap, inFnName, false, MATCH_GREEDY, oReturnData, &fnWeight))
     {
-        fnWeight = 4;
-    }
-    else if (ihiMapFind(inFnMap, inFnName, oReturnData, true))
-    {
-        fnWeight = 1;
+        ihiMapFind(inFnMap, inFnName, true, MATCH_GREEDY, oReturnData, &fnWeight);
     }
 
     return fnWeight;
 }
 
-int
+ULONG
 C_PATCH_INCL_EXCL_MGR::CalcImpModuleMatchWeight(
     PIHI_MAP inImpModuleMap,
     LPCSTR inImpModuleName,
@@ -1088,20 +1106,18 @@ C_PATCH_INCL_EXCL_MGR::CalcImpModuleMatchWeight(
     LPVOID *oReturnData)
 {
     PIHI_MAP *pFnNameMap;
-    int impModuleWeight = 0;
-    int fnWeight = 0;
+    ULONG impModuleWeight = 0;
+    ULONG fnWeight = 0;
 
-    if (ihiMapFind(inImpModuleMap, inImpModuleName, (LPVOID*)&pFnNameMap, false))
+    if (ihiMapFind(inImpModuleMap, inImpModuleName, false, MATCH_GREEDY, (LPVOID*)&pFnNameMap, &impModuleWeight))
     {
-        impModuleWeight = 3;
         fnWeight = CalcFnMatchWeight(*pFnNameMap, inFnName, oReturnData);
     }
 
     if (impModuleWeight == 0 || fnWeight == 0)
     {
-        if (ihiMapFind(inImpModuleMap, inImpModuleName, (LPVOID*)&pFnNameMap, true))
+        if (ihiMapFind(inImpModuleMap, inImpModuleName, true, MATCH_GREEDY, (LPVOID*)&pFnNameMap, &impModuleWeight))
         {
-            impModuleWeight = 1;
             fnWeight = CalcFnMatchWeight(*pFnNameMap, inFnName, oReturnData);
         }
     }
@@ -1114,7 +1130,7 @@ C_PATCH_INCL_EXCL_MGR::CalcImpModuleMatchWeight(
     return impModuleWeight + fnWeight;
 }
 
-int
+ULONG
 C_PATCH_INCL_EXCL_MGR::CalcWeight(
     PIHI_MAP            inLoadedModuleMap,
     LPCSTR              inLoadedModuleName,
@@ -1151,20 +1167,18 @@ Return:
 {   
     PIHI_MAP *pImpModuleMap;
     PIHI_RETURN_DATA *pReturnData;
-    int loadedModuleWeight = 0;
-    int impModuleWeight = 0;
+    ULONG loadedModuleWeight = 0;
+    ULONG impModuleWeight = 0;
 
-    if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, (LPVOID*)&pImpModuleMap, false))
+    if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, false, MATCH_GREEDY, (LPVOID*)&pImpModuleMap, &loadedModuleWeight))
     {
-        loadedModuleWeight = 2;
         impModuleWeight = CalcImpModuleMatchWeight(*pImpModuleMap, inImpModuleName, inFnName, (LPVOID*)&pReturnData);
     }
 
     if (loadedModuleWeight == 0 || impModuleWeight == 0)
     {
-        if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, (LPVOID*)&pImpModuleMap, true))
+        if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, true, MATCH_GREEDY, (LPVOID*)&pImpModuleMap, &loadedModuleWeight))
         {
-            loadedModuleWeight = 1;
             impModuleWeight = CalcImpModuleMatchWeight(*pImpModuleMap, inImpModuleName, inFnName, (LPVOID*)&pReturnData);
         }
     }
@@ -1173,16 +1187,6 @@ Return:
     {
         return 0;
     }
-
-#if 0
-    if (loadedModuleWeight > 0 || impModuleWeight > 0)
-    {
-        if (oRetVal && *pReturnData)
-        {
-            *oRetVal = **pReturnData;
-        }
-    }
-#endif
 
     if (oRetVal && *pReturnData)
     {

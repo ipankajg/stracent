@@ -90,20 +90,34 @@ std::wstring gInjectorDllPath;
 //
 CStView *gView;
 
+//
+// Command line option to store whether to enable anti-debug measures or not.
+//
+bool gEnableAntiDebugMeasures = false;
+
+//
+// Logging level.
+//
+ULONG gLoggingLevel = IHU_LEVEL_ERROR;
 
 //
 // Actions list based on the command line supplied
 // by the user
 //
-typedef enum _COMMAND_LINE_ACTION
-{
+typedef enum _COMMAND_LINE_ACTION {
     CMD_TRACE_NONE,
     CMD_TRACE_HELP,
     CMD_TRACE_BY_PID,
     CMD_TRACE_BY_PNAME,
     CMD_TRACE_NEW_PROC
+} COMMAND_LINE_ACTION;
 
-}COMMAND_LINE_ACTION;
+typedef struct _ST_TRACE_OPTIONS {
+    bool EnableAntiDebugMeasures;
+    ULONG LoggingLevel;
+    ULONG IncludeListOffset;
+    ULONG ExcludeListOffset;
+} ST_TRACE_OPTIONS, *PST_TRACE_OPTIONS;
 
 
 //
@@ -166,12 +180,14 @@ Routine Description:
 
 --*/
 {
-    gView->PrintMessage(L"StraceNT [-f <FilterFile>] [[-p <PID>] | [-a <ProcName>] | [<Cmd [...]>]]\n");
+    gView->PrintMessage(L"StraceNT [-f <FilterFile>] [-e] [-l <LogLevel>] [[-p <PID>] | [-n <ProcName>] | [<Cmd [...]>]]\n");
     gView->PrintMessage(L"\nOptions:\n\n");
-    gView->PrintMessage(L"<FilterFile>   StraceNT filter data file (see stFilter.txt for details)\n");
-    gView->PrintMessage(L"<PID>          Process Id of the process to trace\n");
-    gView->PrintMessage(L"<ProcName>     Process Name of the process to trace\n");
-    gView->PrintMessage(L"<Cmd [...]>    Command to execute and trace (e.g. \"kill 1234\")\n");
+    gView->PrintMessage(L"-f <FilterFile>   Filter data file (see stFilter.txt for details)\n");
+    gView->PrintMessage(L"-e                Enable Anti-Debug Measures\n");
+    gView->PrintMessage(L"-l <LogLevel>     Log Level (0 - None, 1 - Errors <default>, 2 - Info, 3 - All)\n");
+    gView->PrintMessage(L"-p <PID>          Process Id of the process to trace\n");
+    gView->PrintMessage(L"-n <ProcName>     New process name to launch and trace\n");
+    gView->PrintMessage(L"<Cmd [...]>       Command to execute and trace (e.g. \"notepad sampleFile.txt\")\n");
     gView->PrintMessage(L"\n");
 }
 
@@ -455,12 +471,42 @@ Arguments:
                                     }
                                 }
 
-                                IhuInjectDll(
-                                            ghProcess,
-                                            (LPCWSTR)gInjectorDllPath.c_str(),
-                                            (LPCSTR)fnIncludes.c_str(),
-                                            (LPCSTR)fnExcludes.c_str());
+                                //
+                                // Create the parameter block and pass it to IhuInjectDll
+                                //
+                                PST_TRACE_OPTIONS trcOptions;
+                                ULONG trcOptionsSize;
+                                ULONG incListSize;
+                                ULONG excListSize;
 
+                                //
+                                // NOTE: We assume here that string is in ANSI.
+                                //
+                                incListSize = fnIncludes.length() + 1;
+                                excListSize = fnExcludes.length() + 1;
+                                trcOptionsSize = sizeof(ST_TRACE_OPTIONS) + incListSize + excListSize;
+
+                                trcOptions = (PST_TRACE_OPTIONS)malloc(trcOptionsSize);
+                                if (trcOptions == NULL)
+                                {
+                                    gView->PrintError(
+                                        L"Failed to allocate memory. Error code = %x\n",
+                                        GetLastError());
+                                    return;
+                                }
+                                memset(trcOptions, 0, trcOptionsSize); 
+
+                                trcOptions->EnableAntiDebugMeasures = gEnableAntiDebugMeasures;
+                                trcOptions->LoggingLevel = gLoggingLevel;
+                                trcOptions->IncludeListOffset = sizeof(ST_TRACE_OPTIONS);
+                                trcOptions->ExcludeListOffset = trcOptions->IncludeListOffset + incListSize;
+                                strcpy((PCHAR)trcOptions + trcOptions->IncludeListOffset, fnIncludes.c_str());
+                                strcpy((PCHAR)trcOptions + trcOptions->ExcludeListOffset, fnExcludes.c_str());
+
+                                IhuInjectDll(ghProcess, (LPCWSTR)gInjectorDllPath.c_str(),
+                                             trcOptions, trcOptionsSize);
+
+                                free(trcOptions);
                                 processInfected = true;
                             }
 
@@ -659,6 +705,39 @@ Routine Description:
         {
             gRemovePatchOnExit = false;
         }
+        else if (_wcsicmp(argV[indexArgs], L"-e") == 0 ||
+                 _wcsicmp(argV[indexArgs], L"/e") == 0)
+        {
+            gEnableAntiDebugMeasures = true;
+        }
+        else if (_wcsicmp(argV[indexArgs], L"-l") == 0 ||
+                 _wcsicmp(argV[indexArgs], L"/l") == 0)
+        {
+            if (indexArgs == (argC - 1))
+            {
+                gView->PrintError(L"Logging level is _NOT_ specified.\n");
+                goto funcExit;
+            }
+
+            userParam = argV[++indexArgs];
+            gLoggingLevel = wcstoul(userParam.c_str(), NULL, 10);
+            if (gLoggingLevel == 1)
+            {
+                gLoggingLevel = IHU_LEVEL_ERROR;
+            }
+            else if (gLoggingLevel == 2)
+            {
+                gLoggingLevel = IHU_LEVEL_INFO;
+            }
+            else if (gLoggingLevel == 3)
+            {
+                gLoggingLevel = IHU_LEVEL_FLOOD;
+            }
+            else
+            {
+                gLoggingLevel = 0;
+            }
+        }
         else if (   _wcsicmp(argV[indexArgs], L"-f") == 0 ||
                     _wcsicmp(argV[indexArgs], L"/f") == 0)
         {
@@ -694,8 +773,8 @@ Routine Description:
             userAction  = CMD_TRACE_BY_PID;
             userParam   = argV[++indexArgs];
         }
-        else if (   _wcsicmp(argV[indexArgs], L"-a") == 0 ||
-                    _wcsicmp(argV[indexArgs], L"/a") == 0)
+        else if (   _wcsicmp(argV[indexArgs], L"-n") == 0 ||
+                    _wcsicmp(argV[indexArgs], L"/n") == 0)
         {
             if (userAction != CMD_TRACE_NONE)
             {
@@ -725,7 +804,7 @@ Routine Description:
             // full command line for new process and break out of this
             // loop
             //
-            userParam += L"\"";
+            userParam = L"\"";
             userParam += argV[indexArgs];
             userParam += L"\"";
 
@@ -850,6 +929,8 @@ Routine Description:
 
         if (processId)
         {
+            IhuSetDbgLogLevel(gLoggingLevel);
+
             stAttachDebugger(
                         processId,
                         fnIncludes,

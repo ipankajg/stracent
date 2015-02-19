@@ -61,6 +61,18 @@ std::string g_MainExeName;
 //
 LONG gThreadReferenceCount;
 
+//
+// Representation of command line options.
+//
+bool gEnableAntiDebugMeasures = false;
+ULONG gLoggingLevel = IHU_LEVEL_LOUD;
+
+typedef struct _ST_TRACE_OPTIONS {
+    bool EnableAntiDebugMeasures;
+    ULONG LoggingLevel;
+    ULONG IncludeListOffset;
+    ULONG ExcludeListOffset;
+} ST_TRACE_OPTIONS, *PST_TRACE_OPTIONS;
 
 /*++
 
@@ -88,51 +100,27 @@ Return:
 --*/
 void
 WINAPI
-IhSerumLoad(
-    LPCSTR      inFnIncludes,
-    LPCSTR      inFnExcludes)
+IhSerumLoad(PVOID inContext, ULONG inContextSize)
 {
+    PST_TRACE_OPTIONS trcOptions;
+    
+    trcOptions = (PST_TRACE_OPTIONS)inContext;
     //
-    // Pass this log level to serum from StraceNT via some command line.
+    // TODO: Validate if IncludeListOffset and ExcludeListOffset fall
+    // with-in inContext size or not.
     //
-    IhuSetDbgLogLevel(IHU_LEVEL_INFO);
 
-    __asm
+    IhuSetDbgLogLevel(trcOptions->LoggingLevel);
+
+    if (trcOptions->EnableAntiDebugMeasures)
     {
-        push eax;
-        push ebx;
-
-        //
-        // Clear PEB.BeingDebugged.
-        //
-        mov eax, dword ptr fs:[0x30];
-        mov byte ptr [eax + 0x2], 0;
-
-        //
-        // Clear PEB.NtGlobalFlag
-        //
-        mov dword ptr [eax + 0x68], 0;
-
-        //
-        // Clear ProcessHeap.ForceFlags
-        //
-        mov ebx, dword ptr [eax + 0x18];
-        lea eax, [ebx + 0xc];
-        mov dword ptr [eax], 2;
-        lea eax, [ebx + 0x10];
-        mov dword ptr [eax], 0;
-
-        pop ebx;
-        pop eax;
+        ihiDisableAntiDebugMeasures();
     }
 
     char szModuleName[MAX_PATH] = {0};
 
-    if (GetModuleBaseNameA(
-                    GetCurrentProcess(),
-                    GetModuleHandle(NULL),
-                    szModuleName,
-                    sizeof(szModuleName)) > 0)
+    if (GetModuleBaseNameA(GetCurrentProcess(), GetModuleHandle(NULL),
+                           szModuleName, sizeof(szModuleName)) > 0)
     {
         g_MainExeName = szModuleName;
     }
@@ -152,13 +140,10 @@ IhSerumLoad(
     // Which modules import table to patch, and finally
     // which functions to patch
     //
-    gPatchInclExclMgr.SetInclExclList(
-                            inFnIncludes,
-                            inFnExcludes);
+    gPatchInclExclMgr.SetInclExclList((PCHAR)trcOptions + trcOptions->IncludeListOffset,
+                                      (PCHAR)trcOptions + trcOptions->ExcludeListOffset);
 
-    IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_LOUD, L"ihiInitiatePatching called.\n");
-
-    // Initiate the patching process
+    IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_LOUD, L"Initiating the patching process.\n");
     ihiPatchUnpatchModules(g_hInstance, true);
 
     g_processPatched = true;
@@ -186,9 +171,7 @@ void
 WINAPI
 IhSerumUnload()
 {
-    ihiPatchUnpatchModules(
-                        g_hInstance,
-                        false);
+    ihiPatchUnpatchModules(g_hInstance, false);
 }
 
 

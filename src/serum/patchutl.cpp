@@ -343,8 +343,10 @@ bool
 ihiMapFind(
     PIHI_MAP    inMap,
     LPCSTR      inKey,
+    bool        inDoPrefixMatch,
+    IHI_PREFIX_MATCH_MODE inMatchMode,
     LPVOID      *oValue,
-    bool        inDoPrefixMatch)
+    PULONG      oMatchValue)
 /*++
 
 Routine Description:
@@ -367,6 +369,8 @@ Returns:
 --*/
 {
     bool retVal = false;
+    ULONG matchValue = 0;
+
     if (!inDoPrefixMatch)
     {
         for (IHI_MAP *pCurrent = inMap; pCurrent; pCurrent = pCurrent->Next)
@@ -375,6 +379,7 @@ Returns:
             {
                 *oValue = &pCurrent->Value;
                 retVal = true;
+                matchValue = strlen(pCurrent->Key) + 2;
                 goto End;
             }
         }
@@ -383,27 +388,53 @@ Returns:
     {
         for (IHI_MAP *pCurrent = inMap; pCurrent; pCurrent = pCurrent->Next)
         {
-            if (_strnicmp(pCurrent->Key, inKey, strlen(pCurrent->Key)) == 0)
+            if (pCurrent->IsPrefix)
             {
-                *oValue = &pCurrent->Value;
-                retVal = true;
-                goto End;
+                if (inMatchMode == MATCH_EXACT)
+                {
+                    if (_stricmp(pCurrent->Key, inKey) == 0)
+                    {
+                        *oValue = &pCurrent->Value;
+                        retVal = true;
+                        matchValue = strlen(pCurrent->Key) + 1;
+                        goto End;
+                    }
+                }
+                else
+                {
+                    //
+                    // Do a greedy matching.
+                    //
+                    ULONG tmpMatchValue = 0;
+                    if (_strnicmp(pCurrent->Key, inKey, strlen(pCurrent->Key)) == 0)
+                    {   
+                        retVal = true;
+                        tmpMatchValue = strlen(pCurrent->Key) + 1;
+                        if (matchValue < tmpMatchValue)
+                        {
+                            *oValue = &pCurrent->Value;
+                            matchValue = tmpMatchValue;
+                        }
+                        //
+                        // Let the loop continue as we are looking for greedy match.
+                        //
+                    }
+                }
             }
         }
     }
 
 End:
-
+    if (oMatchValue != NULL)
+    {
+        *oMatchValue = matchValue;
+    }
     return retVal;
 }
 
 
 bool
-ihiMapAssign(
-    PIHI_MAP    *ioMap,
-    LPCSTR      inKey,
-//    bool        inIsPrefix,
-    LPVOID      inValue)
+ihiMapAssign(PIHI_MAP *ioMap, LPCSTR inKey, bool inIsPrefix, LPVOID inValue)
 /*++
 
 Routine Description:
@@ -427,7 +458,7 @@ Returns:
 
     memset(tempMap, 0, sizeof(IHI_MAP));
     StringCchCopyA(tempMap->Key, MAX_PATH, inKey);
-//    tempMap->IsPrefix = inIsPrefix;
+    tempMap->IsPrefix = inIsPrefix;
     tempMap->Value = inValue;
     tempMap->Next = NULL;
 
@@ -439,4 +470,37 @@ Returns:
     *ioMap = tempMap;
 
     return true;
+}
+
+VOID
+ihiDisableAntiDebugMeasures()
+{
+    __asm
+    {
+        push eax;
+        push ebx;
+
+        //
+        // Clear PEB.BeingDebugged.
+        //
+        mov eax, dword ptr fs : [0x30];
+        mov byte ptr[eax + 0x2], 0;
+
+        //
+        // Clear PEB.NtGlobalFlag
+        //
+        mov dword ptr[eax + 0x68], 0;
+
+        //
+        // Clear ProcessHeap.ForceFlags
+        //
+        mov ebx, dword ptr[eax + 0x18];
+        lea eax, [ebx + 0xc];
+        mov dword ptr[eax], 2;
+        lea eax, [ebx + 0x10];
+        mov dword ptr[eax], 0;
+
+        pop ebx;
+        pop eax;
+    }
 }
