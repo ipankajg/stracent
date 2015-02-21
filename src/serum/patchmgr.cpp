@@ -264,7 +264,7 @@ CPatchManager::InsertNewPatch(
         inApiName);
 
     patchedApiArray->mApiData[entryIndex].mOriginalAddress  = inOrigFuncAddr;
-    patchedApiArray->mApiData[entryIndex].mReturnData       = inRetValInfo;
+    patchedApiArray->mApiData[entryIndex].mReturnValue      = inRetValInfo;
 
     // one more api patched
     mPatchedApiCount++;
@@ -439,7 +439,7 @@ Return:
 
     IHI_PATCHED_API_DATA *patchedApiArray = GetPatchedApiArrayAt(tableIndex);
 
-    oRetValInfo = patchedApiArray->mApiData[entryIndex].mReturnData;
+    oRetValInfo = patchedApiArray->mApiData[entryIndex].mReturnValue;
     return;
 }
 
@@ -680,8 +680,6 @@ Routine Description:
 --*/
 CPatchInclExclMgr::CPatchInclExclMgr()
 {
-    m_IncludeList = NULL;
-    m_ExcludeList = NULL;
 }
 
 
@@ -698,49 +696,6 @@ Routine Description:
 --*/
 CPatchInclExclMgr::~CPatchInclExclMgr()
 {
-    PIHI_MAP pCurrent;
-
-    pCurrent = m_IncludeList;
-
-    while(pCurrent)
-    {
-        PIHI_MAP pChildCurrent = (PIHI_MAP)pCurrent->Value;
-
-        while(pChildCurrent)
-        {
-            IHI_FN_RETURN_VALUE *pReturnValueInfo = (IHI_FN_RETURN_VALUE *)pChildCurrent->Value;
-            delete pReturnValueInfo;
-
-            PIHI_MAP pChildTemp = pChildCurrent;
-            pChildCurrent = pChildCurrent->Next;
-            delete pChildTemp;
-        }
-
-        PIHI_MAP pTemp = pCurrent;
-        pCurrent = pCurrent->Next;
-        delete pTemp;
-    }
-
-    pCurrent = m_ExcludeList;
-
-    while(pCurrent)
-    {
-        PIHI_MAP pChildCurrent = (PIHI_MAP)pCurrent->Value;
-
-        while(pChildCurrent)
-        {
-            //
-            // Excluded list doesn't have return value information
-            //
-            PIHI_MAP pChildTemp = pChildCurrent;
-            pChildCurrent = pChildCurrent->Next;
-            delete pChildTemp;
-        }
-
-        PIHI_MAP pTemp = pCurrent;
-        pCurrent = pCurrent->Next;
-        delete pTemp;
-    }
 }
 
 
@@ -773,7 +728,7 @@ CPatchInclExclMgr::SetInclExclList(
     IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
         L"Adding hardcoded excludes: %S\n",
         fixedExcludes.c_str());
-    BuildInclOrExclList(fixedExcludes, &m_ExcludeList);
+    BuildInclOrExclList(fixedExcludes, m_ExcludeRuleList);
 
     //
     // User provided include/exclude.
@@ -784,42 +739,24 @@ CPatchInclExclMgr::SetInclExclList(
     IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
         L"Adding user includes: %S\n",
         fnIncList.c_str());
-    BuildInclOrExclList(fnIncList, &m_IncludeList);
+    BuildInclOrExclList(fnIncList, m_IncludeRuleList);
     IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
         L"Adding user excludes: %S\n",
         fnExcList.c_str());
-    BuildInclOrExclList(fnExcList, &m_ExcludeList);
+    BuildInclOrExclList(fnExcList, m_ExcludeRuleList);
 
-    ihiMapDump(m_IncludeList, L"INCLUDE");
-    ihiMapDump(m_ExcludeList, L"EXCLUDE");
+    ihiRuleListDump(m_IncludeRuleList, L"INCLUDE");
+    ihiRuleListDump(m_ExcludeRuleList, L"EXCLUDE");
 }
 
 
-/*++
-
-Routine Name:
-
-    BuildInclOrExclList
-
-Routine Description:
-
-    Parses the inclusion or exclusion list given in the format
-    <loaded_module:imp_module:fn_name> and builds the map data
-    structure for htat
-
-Return:
-
-    none
-
---*/
 void
 CPatchInclExclMgr::BuildInclOrExclList(
-    std::string         inFnList,
-    PIHI_MAP            *ioMap)
+    std::string inFnList,
+    InclExclRuleList &ioRuleList)
 {
     // Start from second character as first character will be <
     int index_begin = 1;
-
     int index_end = 0;
 
     while (true)
@@ -843,7 +780,7 @@ CPatchInclExclMgr::BuildInclOrExclList(
             bool loadedModuleIsPrefix;
             bool impModuleIsPrefix;
             bool fnNameIsPrefix;
-            std::string     retValStr;
+            std::string retValStr;
             IHI_FN_RETURN_VALUE retValInfo = {0};
 
             loadedModuleIsPrefix = false;
@@ -906,6 +843,7 @@ CPatchInclExclMgr::BuildInclOrExclList(
                 IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_ERROR,
                     L"Ignoring invalid include/exclude list: %S\n",
                     fnInc.c_str());
+                break;
             }
             
             if (*loadedModule.rbegin() == '*')
@@ -926,60 +864,15 @@ CPatchInclExclMgr::BuildInclOrExclList(
                 fnNameIsPrefix = true;
             }
 
-            PIHI_MAP *pImpModuleMap  = NULL;
-            PIHI_MAP *pFnNameMap     = NULL;
-            IHI_FN_RETURN_VALUE *pReturnValueInfo    = NULL;
-            IHI_MATCH_DATA matchData;
-
-            //
-            // Create loaded module entry if it does not exist.
-            //
-            if (!ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, MATCH_EXACT, &matchData))
-            {
-                if (!ihiMapAssign(ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, NULL))
-                {
-                    return;
-                }
-            }
-
-            //
-            // Create import module entry if it does not exist.
-            //
-            ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, MATCH_EXACT, &matchData);
-            pImpModuleMap = (PIHI_MAP *)matchData.KeyValue;
-            if (!ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, MATCH_EXACT, &matchData))
-            {
-                if (!ihiMapAssign(pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, NULL))
-                {
-                    return;
-                }
-            }
-
-            //
-            // Create function name entry if it does not exist.
-            //
-            ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, MATCH_EXACT, &matchData);
-            pFnNameMap = (PIHI_MAP *)matchData.KeyValue;
-            if (!ihiMapFind(*pFnNameMap, (LPCSTR)fnName.c_str(), fnNameIsPrefix, MATCH_EXACT, &matchData))
-            {
-                pReturnValueInfo = NULL;
-
-                if (retValInfo.UserSpecified)
-                {
-                    pReturnValueInfo = new IHI_FN_RETURN_VALUE;
-                    if (pReturnValueInfo == NULL)
-                    {
-                        return;
-                    }
-                    memset(pReturnValueInfo, 0, sizeof(IHI_FN_RETURN_VALUE));
-                    *pReturnValueInfo = retValInfo;
-                }
-
-                if (!ihiMapAssign(pFnNameMap, (LPCSTR)fnName.c_str(), fnNameIsPrefix, pReturnValueInfo))
-                {
-                    return;
-                }
-            }
+            InclExclRule rule;
+            rule.LoadedModuleName = loadedModule;
+            rule.LoadedModuleNameIsPrefix = loadedModuleIsPrefix;
+            rule.ImportedModuleName = impModule;
+            rule.ImportedModuleNameIsPrefix = impModuleIsPrefix;
+            rule.FunctionName = fnName;
+            rule.FunctionNameIsPrefix = fnNameIsPrefix;
+            rule.ReturnValue = retValInfo;
+            ioRuleList.push_back(rule);
         } while (false);
 
         index_begin = index_end + 2;
@@ -1033,6 +926,8 @@ Return:
     bool funcResult = false;
     int inclWeight = 0;
     int exclWeight = 0;
+    InclExclRuleMatchInfo inclRule;
+    InclExclRuleMatchInfo exclRule;
 
     IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD,
         L"IsPatchRequired for: %S, %S, %S\n",
@@ -1044,25 +939,20 @@ Return:
         goto Exit;
     }
 
-    inclWeight = CalcWeight(
-                        m_IncludeList,
-                        inLoadedModuleName,
-                        inImpModuleName,
-                        inFnName,
-                        oRetValInfo);
+    inclRule.MatchWeight = 0;
+    inclRule.LoadedModuleName = inLoadedModuleName;
+    inclRule.ImportedModuleName = inImpModuleName;
+    inclRule.FunctionName = inFnName;
+    exclRule = inclRule;
 
-    exclWeight = CalcWeight(
-                        m_ExcludeList,
-                        inLoadedModuleName,
-                        inImpModuleName,
-                        inFnName,
-                        NULL);
+    ihiRuleFind(m_IncludeRuleList, inclRule);
+    ihiRuleFind(m_ExcludeRuleList, exclRule);
 
     IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD,
         L"IsPatchRequired InclWeight: %x, ExclWeight: %x\n",
-        inclWeight, exclWeight);
+        inclRule.MatchWeight, exclRule.MatchWeight);
 
-    if (exclWeight <= inclWeight)
+    if (exclRule.MatchWeight <= inclRule.MatchWeight)
     {
         funcResult = true;
     }
@@ -1075,6 +965,11 @@ Exit:
 
     if (funcResult)
     {
+        if (oRetValInfo != NULL)
+        {
+            *oRetValInfo = inclRule.ReturnValue;
+        }
+
         if (inFnName != NULL)
         {
             IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
@@ -1088,174 +983,4 @@ Exit:
     return funcResult;
 }
 
-
-ULONG
-CPatchInclExclMgr::CalcFnMatchWeight(
-    PIHI_MAP inFnMap,
-    LPCSTR inFnName,
-    LPVOID *oRetValInfo)
-{
-    IHI_MATCH_DATA matchData = { 0 };
-
-    if (!ihiMapFind(inFnMap, inFnName, false, MATCH_EXACT, &matchData))
-        ihiMapFind(inFnMap, inFnName, true, MATCH_LONGEST, &matchData);
-
-    if (oRetValInfo != NULL)
-        *oRetValInfo = matchData.KeyValue;
-
-    return matchData.MatchValue;
-}
-
-ULONG
-CPatchInclExclMgr::CalcImpModuleMatchWeightInternal(
-    PIHI_MATCH_DATA inMatchData,
-    LPCSTR inFnName,
-    LPVOID *oRetValInfo)
-{
-    PIHI_MAP *pFnNameMap;
-    ULONG impModuleWeight = 0;
-    ULONG fnWeight = 0;
-
-    pFnNameMap = (PIHI_MAP *)inMatchData->KeyValue;
-    impModuleWeight = inMatchData->MatchValue;
-    fnWeight = CalcFnMatchWeight(*pFnNameMap, inFnName, oRetValInfo);
-
-    if (impModuleWeight == 0 || fnWeight == 0)
-    {
-        return 0;
-    }
-
-    return impModuleWeight + fnWeight;
-}
-
-ULONG
-CPatchInclExclMgr::CalcImpModuleMatchWeight(
-    PIHI_MAP inImpModuleMap,
-    LPCSTR inImpModuleName,
-    LPCSTR inFnName,
-    LPVOID *oRetValInfo)
-{
-    IHI_MATCH_DATA matchData = { 0 };
-    ULONG impModuleWeight = 0;
-    PIHI_MATCH_DATA matchDataPtr;
-
-    if (ihiMapFind(inImpModuleMap, inImpModuleName, false, MATCH_EXACT, &matchData))
-    {
-        impModuleWeight = CalcImpModuleMatchWeightInternal(&matchData, inFnName, oRetValInfo);
-    }
-
-    if (impModuleWeight == 0)
-    {
-        if (ihiMapFind(inImpModuleMap, inImpModuleName, true, MATCH_ALL, &matchData))
-        {
-            ULONG tmpImpWeight = 0;
-            LPVOID tmpRetValInfo;
-            for (matchDataPtr = &matchData; matchDataPtr != NULL; matchDataPtr = matchDataPtr->Next)
-            {
-                tmpImpWeight = CalcImpModuleMatchWeightInternal(matchDataPtr, inFnName, &tmpRetValInfo);
-                if (tmpImpWeight > impModuleWeight)
-                {
-                    impModuleWeight = tmpImpWeight;
-                    if (oRetValInfo != NULL)
-                        *oRetValInfo = tmpRetValInfo;
-                }
-            }
-        }
-    }
-
-    return impModuleWeight;
-}
-
-ULONG
-CPatchInclExclMgr::CalcTotalWeight(
-    PIHI_MATCH_DATA inMatchData,
-    LPCSTR inImpModuleName,
-    LPCSTR inFnName,
-    LPVOID *oRetValInfo)
-{
-    PIHI_MAP *pImpModuleMap;
-    ULONG loadedModuleWeight = 0;
-    ULONG impModuleWeight = 0;
-
-    pImpModuleMap = (PIHI_MAP *)inMatchData->KeyValue;
-    loadedModuleWeight = inMatchData->MatchValue;
-    impModuleWeight = CalcImpModuleMatchWeight(*pImpModuleMap, inImpModuleName, inFnName, oRetValInfo);
-
-    if (loadedModuleWeight == 0 || impModuleWeight == 0)
-        return 0;
-
-    return loadedModuleWeight + impModuleWeight;
-    
-}
-
-ULONG
-CPatchInclExclMgr::CalcWeight(
-    PIHI_MAP inLoadedModuleMap,
-    LPCSTR inLoadedModuleName,
-    LPCSTR inImpModuleName,
-    LPCSTR inFnName,
-    IHI_FN_RETURN_VALUE *oRetValInfo)
-/*++
-
-Routine Description:
-
-    Calculates the weight of a match. We weigh each exact match as 2 and
-    each generic match as 1. All the possible combinations are explored to
-    find the best match. This is more like a directed graph problem.
-
-Arguments:
-
-    inLoadedModuleName - The module which is calling the function
-
-    inImpModuleName - The module which implements the function
-
-    inFnName - Name of the function (for functions exported by ordinal
-        this name is Ord%x)
-
-    oRetValInfo - Optional return value information for the best match
-
-    inLoadedModuleMap - reference to the map (or graph) for either included
-        functions or excluded functions
-
-Return:
-
-    int - a number representing the weight of the function
-
---*/
-{
-    ULONG totalWeight = 0;
-    PIHI_FN_RETURN_VALUE *pReturnValueInfo = NULL;
-    IHI_MATCH_DATA matchData = { 0 };
-    PIHI_MATCH_DATA matchDataPtr;
-
-    if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, false, MATCH_EXACT, &matchData))
-    {
-        totalWeight = CalcTotalWeight(&matchData, inImpModuleName, inFnName, (LPVOID*)pReturnValueInfo);
-    }
-
-    if (totalWeight == 0)
-    {
-        if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, true, MATCH_ALL, &matchData))
-        {
-            ULONG tmpTotalWeight = 0;
-            LPVOID tmpRetValInfo;
-            for (matchDataPtr = &matchData; matchDataPtr != NULL; matchDataPtr = matchDataPtr->Next)
-            {
-                tmpTotalWeight = CalcTotalWeight(matchDataPtr, inImpModuleName, inFnName, &tmpRetValInfo);
-                if (tmpTotalWeight > totalWeight)
-                {
-                    totalWeight = tmpTotalWeight;
-                    pReturnValueInfo = (PIHI_FN_RETURN_VALUE*)tmpRetValInfo;
-                }
-            }
-        }
-    }
-
-    if (oRetValInfo && pReturnValueInfo && *pReturnValueInfo)
-    {
-        *oRetValInfo = **pReturnValueInfo;
-    }
-
-    return totalWeight;
-}
 

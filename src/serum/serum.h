@@ -228,37 +228,30 @@ typedef struct _IHI_MAP
 struct InclExclRule
 {
     string LoadedModuleName;
+    bool LoadedModuleNameIsPrefix;
     string ImportedModuleName;
+    bool ImportedModuleNameIsPrefix;
     string FunctionName;
+    bool FunctionNameIsPrefix;
     IHI_FN_RETURN_VALUE ReturnValue;
 };
 
 typedef vector<InclExclRule> InclExclRuleList;
 
-void
-ihiMapDump(PIHI_MAP inMap, LPCWSTR inTitle);
-
-enum IHI_PREFIX_MATCH_MODE
+struct InclExclRuleMatchInfo
 {
-    MATCH_EXACT,
-    MATCH_LONGEST,
-    MATCH_ALL
+    string LoadedModuleName;
+    string ImportedModuleName;
+    string FunctionName;
+    IHI_FN_RETURN_VALUE ReturnValue;
+    ULONG MatchWeight;
 };
 
-struct _IHI_MATCH_DATA;
-typedef struct _IHI_MATCH_DATA
-{
-    LPVOID KeyValue;
-    ULONG MatchValue;
-    struct _IHI_MATCH_DATA *Next;
-} IHI_MATCH_DATA, *PIHI_MATCH_DATA;
+void
+ihiRuleListDump(InclExclRuleList &inRuleList, LPCWSTR inTitle);
 
 bool
-ihiMapFind(PIHI_MAP inMap, LPCSTR inKey, bool inMatchTypePrefix,
-           IHI_PREFIX_MATCH_MODE inPrefixMatchMode, PIHI_MATCH_DATA oMatchData);
-
-bool
-ihiMapAssign(PIHI_MAP *ioMap, LPCSTR inKey, bool inIsPrefix, LPVOID inValue);
+ihiRuleFind(InclExclRuleList &inRuleList, InclExclRuleMatchInfo &ioRuleMatchInfo);
 
 //
 // Patch manager class
@@ -385,8 +378,8 @@ public:
 
     void
         BuildInclOrExclList(
-        std::string         inFnList,
-        PIHI_MAP            *ioMap);
+        std::string inFnList,
+        InclExclRuleList &ioRuleList);
 
     bool
         PatchRequired(
@@ -396,43 +389,7 @@ public:
         bool            inOrdinalExport,
         IHI_FN_RETURN_VALUE *oRetVal);
 
-    ULONG
-        CalcWeight(
-        PIHI_MAP            inLoadedModuleMap,
-        LPCSTR              inLoadedModuleName,
-        LPCSTR              inImpModuleName,
-        LPCSTR              inFnName,
-        IHI_FN_RETURN_VALUE     *oRetVal);
-
-    ULONG
-        CalcTotalWeight(
-        PIHI_MATCH_DATA inMatchData,
-        LPCSTR inImpModuleName,
-        LPCSTR inFnName,
-        LPVOID *oRetValInfo);
-
-    ULONG
-        CalcFnMatchWeight(
-        PIHI_MAP inFnMap,
-        LPCSTR inFnName,
-        LPVOID *oRetValInfo);
-
-    ULONG
-        CalcImpModuleMatchWeight(
-        PIHI_MAP inImpModuleMap,
-        LPCSTR inImpModuleName,
-        LPCSTR inFnName,
-        LPVOID *oRetValInfo);
-
-    ULONG
-        CalcImpModuleMatchWeightInternal(
-        PIHI_MATCH_DATA inMatchData,
-        LPCSTR inFnName,
-        LPVOID *oRetValInfo);
-
 private:
-    PIHI_MAP            m_IncludeList;
-    PIHI_MAP            m_ExcludeList;
     InclExclRuleList    m_IncludeRuleList;
     InclExclRuleList    m_ExcludeRuleList;
 };

@@ -39,183 +39,75 @@ Module Description:
 
 
 void
-ihiMapDump(PIHI_MAP inMap, LPCWSTR inTitle)
+ihiRuleListDump(InclExclRuleList &inRuleList, LPCWSTR inTitle)
 {
-    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"**** DUMPING %s MAP ****\n", inTitle);
-    for (IHI_MAP *pCurrent = inMap; pCurrent; pCurrent = pCurrent->Next)
+    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"**** DUMPING %s Rule List ****\n", inTitle);
+    for (int i = 0; i < inRuleList.size(); i++)
     {
+        ULONG tmpWeight = 0;
+        InclExclRule &rule = inRuleList.at(i);
         IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
-            L"Key: %S, Value: %x\n", pCurrent->Key, &pCurrent->Value);
-
-        if (pCurrent->Value != NULL)
-        {
-            for (IHI_MAP *pCurrent2 = (PIHI_MAP)pCurrent->Value; pCurrent2; pCurrent2 = pCurrent2->Next)
-            {
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
-                    L"\tKey: %S\n", pCurrent2->Key);
-
-                if (pCurrent2->Value != NULL)
-                {
-                    for (IHI_MAP *pCurrent3 = (PIHI_MAP)pCurrent2->Value; pCurrent3; pCurrent3 = pCurrent3->Next)
-                    {
-                        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
-                            L"\t\tKey: %S\n", pCurrent3->Key);
-                    }
-                }
-            }
-        }
+            L"Rule Index: %d\n"
+            L"\tLoadedModuleName: %S, PrefixBased: %S\n"
+            L"\tImportModuleName: %S, PrefixBased: %S\n"
+            L"\tFunctionName: %S, PrefixBased: %S\n",
+            i,
+            rule.LoadedModuleName.c_str(), (rule.LoadedModuleNameIsPrefix ? "Yes" : "No"),
+            rule.ImportedModuleName.c_str(), (rule.ImportedModuleNameIsPrefix ? "Yes" : "No"),
+            rule.FunctionName.c_str(), (rule.FunctionNameIsPrefix ? "Yes" : "No"));
     }
 }
 
 
+ULONG
+ihiCalcMatchWeight(string &inString1, bool inIsPrefix, string &inString2)
+{
+    ULONG matchWeight = 0;
+    if (_strnicmp(inString1.c_str(), inString2.c_str(), strlen(inString1.c_str())) == 0)
+    {
+        matchWeight = strlen(inString1.c_str()) + (inIsPrefix ? 1 : 2);
+    }
+
+    return matchWeight;
+}
+
+
 bool
-ihiMapFind(PIHI_MAP inMap, LPCSTR inKey, bool inMatchTypePrefix,
-           IHI_PREFIX_MATCH_MODE inPrefixMatchMode, PIHI_MATCH_DATA oMatchData)
-/*++
-
-Routine Description:
-
-    This routine tries to find a value for a given key in a given map. Note
-    here that if a key is found, the address of the value is returned and
-    not the value itself. We return the address because there are some cases
-    in which caller wants to modify the value field of map to point to some
-    other value.
-
-    For example if we have a map entry as key = "test", value = NULL, then
-    by returning the address of value, we allow a caller to modify the value
-    directly. See how it is used in BuildInclExclList.
-
-Returns:
-
-    false - if not found
-    true - in all other cases
-
---*/
+ihiRuleFind(InclExclRuleList &inRuleList, InclExclRuleMatchInfo &ioRuleMatchInfo)
 {
     bool matchFound;
-    ULONG matchValue;
-    PIHI_MATCH_DATA *matchDataPtr;
+    InclExclRuleList::iterator rlIter;
+    ULONG loadedModuleMatchWeight;
+    ULONG importModuleMatchWeight;
+    ULONG fnMatchWeight;
+    ULONG totalWeight;
     
     matchFound = false;
-    matchValue = 0;
-    matchDataPtr = &oMatchData;
+    totalWeight = 0;
 
-    if (!inMatchTypePrefix)
+    for (int i = 0; i < inRuleList.size(); i++)
     {
-        for (IHI_MAP *pCurrent = inMap; pCurrent; pCurrent = pCurrent->Next)
+        ULONG tmpWeight = 0;
+        InclExclRule &rule = inRuleList.at(i);
+        loadedModuleMatchWeight = ihiCalcMatchWeight(rule.LoadedModuleName, rule.LoadedModuleNameIsPrefix, ioRuleMatchInfo.LoadedModuleName);
+        importModuleMatchWeight = ihiCalcMatchWeight(rule.ImportedModuleName, rule.ImportedModuleNameIsPrefix, ioRuleMatchInfo.ImportedModuleName);
+        fnMatchWeight = ihiCalcMatchWeight(rule.FunctionName, rule.FunctionNameIsPrefix, ioRuleMatchInfo.FunctionName);
+
+        if (loadedModuleMatchWeight != 0 && importModuleMatchWeight != 0 && fnMatchWeight != 0)
         {
-            if (_stricmp(pCurrent->Key, inKey) == 0)
+            matchFound = TRUE;
+            tmpWeight = loadedModuleMatchWeight + importModuleMatchWeight + fnMatchWeight;
+
+            if (tmpWeight > totalWeight)
             {
-                matchFound = true;
-                matchValue = strlen(pCurrent->Key) + 2;
-                oMatchData->KeyValue = &pCurrent->Value;
-                oMatchData->MatchValue = matchValue;
-                goto End;
-            }
-        }
-    }
-    else
-    {
-        for (IHI_MAP *pCurrent = inMap; pCurrent; pCurrent = pCurrent->Next)
-        {
-            if (pCurrent->IsPrefix)
-            {
-                if (inPrefixMatchMode == MATCH_EXACT)
-                {
-                    if (_stricmp(pCurrent->Key, inKey) == 0)
-                    {
-                        matchFound = true;
-                        matchValue = strlen(pCurrent->Key) + 1;
-                        oMatchData->KeyValue = &pCurrent->Value;
-                        oMatchData->MatchValue = matchValue;
-                        goto End;
-                    }
-                }
-                else
-                {
-                    ULONG tmpMatchValue = 0;
-                    if (_strnicmp(pCurrent->Key, inKey, strlen(pCurrent->Key)) == 0)
-                    {
-                        matchFound = true;
-                        tmpMatchValue = strlen(pCurrent->Key) + 1;
-
-                        if (inPrefixMatchMode == MATCH_LONGEST)
-                        {
-                            if (matchValue < tmpMatchValue)
-                            {
-                                matchValue = tmpMatchValue;
-                                oMatchData->KeyValue = &pCurrent->Value;
-                                oMatchData->MatchValue = matchValue;
-                            }
-                        }
-                        else
-                        {
-                            PIHI_MATCH_DATA tmpMatchData;
-
-                            if (*matchDataPtr == NULL)
-                            {
-                                tmpMatchData = new IHI_MATCH_DATA;
-                                if (tmpMatchData == NULL)
-                                {
-                                    goto End;
-                                }
-                                *matchDataPtr = tmpMatchData;
-                            }
-
-                            (*matchDataPtr)->KeyValue = &pCurrent->Value;
-                            (*matchDataPtr)->MatchValue = tmpMatchValue;
-                            (*matchDataPtr)->Next = NULL;
-                            matchDataPtr = &((*matchDataPtr)->Next);
-                        }
-
-                    }
-                }
+                totalWeight = tmpWeight;
+                ioRuleMatchInfo.ReturnValue = rule.ReturnValue;
+                ioRuleMatchInfo.MatchWeight = totalWeight;
             }
         }
     }
 
-End:
     return matchFound;
-}
-
-
-bool
-ihiMapAssign(PIHI_MAP *ioMap, LPCSTR inKey, bool inIsPrefix, LPVOID inValue)
-/*++
-
-Routine Description:
-
-    This routine creates a new MAP entry and inserts it into the existing
-    map supplied in ioMap. We pass the address of the MAP head such that
-    when we insert the first item, we modify the head itself to point to it.
-
-Returns:
-
-    false - if memory allocation for new map failed
-    true - in all other cases
-
---*/
-{
-    IHI_MAP *tempMap = new IHI_MAP;
-    if (tempMap == NULL)
-    {
-        return false;
-    }
-
-    memset(tempMap, 0, sizeof(IHI_MAP));
-    StringCchCopyA(tempMap->Key, MAX_PATH, inKey);
-    tempMap->IsPrefix = inIsPrefix;
-    tempMap->Value = inValue;
-    tempMap->Next = NULL;
-
-    while (*ioMap)
-    {
-        ioMap = &((*ioMap)->Next);
-    }
-
-    *ioMap = tempMap;
-
-    return true;
 }
 
 
