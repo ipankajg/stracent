@@ -73,7 +73,7 @@ ihiToUpper(char c)
 
 Routine Name:
 
-    C_PATCH_MANAGER
+    CPatchManager
 
 Routine Description:
 
@@ -84,7 +84,7 @@ Return:
     none
 
 --*/
-C_PATCH_MANAGER::C_PATCH_MANAGER()
+CPatchManager::CPatchManager()
 {
     mPatchManagerMutex = CreateMutex(NULL, FALSE, NULL);
 
@@ -103,7 +103,7 @@ C_PATCH_MANAGER::C_PATCH_MANAGER()
 
 Routine Name:
 
-    ~C_PATCH_MANAGER
+    ~CPatchManager
 
 Routine Description:
 
@@ -114,7 +114,7 @@ Return:
     none
 
 --*/
-C_PATCH_MANAGER::~C_PATCH_MANAGER()
+CPatchManager::~CPatchManager()
 {
     // Reset the list of patched API
     mPatchedApiListHead = NULL;
@@ -146,7 +146,7 @@ Return:
 
 --*/
 void
-C_PATCH_MANAGER::Lock()
+CPatchManager::Lock()
 {
     WaitForSingleObject(mPatchManagerMutex, INFINITE);
 }
@@ -169,7 +169,7 @@ Return:
 
 --*/
 void
-C_PATCH_MANAGER::UnLock()
+CPatchManager::UnLock()
 {
     ReleaseMutex(mPatchManagerMutex);
 }
@@ -201,10 +201,10 @@ Return:
 
 --*/
 LPVOID
-C_PATCH_MANAGER::InsertNewPatch(
+CPatchManager::InsertNewPatch(
     LPSTR           inApiName,
     LPVOID          inOrigFuncAddr,
-    IHI_RETURN_DATA &inReturnData)
+    IHI_FN_RETURN_VALUE &inRetValInfo)
 {
     LPVOID funcReturn = NULL;
     IHI_PATCHED_API_DATA *patchedApiArray = NULL;
@@ -264,7 +264,7 @@ C_PATCH_MANAGER::InsertNewPatch(
         inApiName);
 
     patchedApiArray->mApiData[entryIndex].mOriginalAddress  = inOrigFuncAddr;
-    patchedApiArray->mApiData[entryIndex].mReturnData       = inReturnData;
+    patchedApiArray->mApiData[entryIndex].mReturnData       = inRetValInfo;
 
     // one more api patched
     mPatchedApiCount++;
@@ -286,7 +286,7 @@ funcEnd:
 
 
 IHI_PATCHED_API_DATA *
-C_PATCH_MANAGER::GetPatchedApiArrayAt(
+CPatchManager::GetPatchedApiArrayAt(
     ULONG inIndex)
 /*++
 
@@ -318,7 +318,7 @@ Return:
 
 
 LPVOID
-C_PATCH_MANAGER::GetOrigFuncAddrAt(
+CPatchManager::GetOrigFuncAddrAt(
     ULONG inIndex)
 /*++
 
@@ -363,7 +363,7 @@ Return:
 
 --*/
 LPVOID
-C_PATCH_MANAGER::GetMatchingOrigFuncAddr(
+CPatchManager::GetMatchingOrigFuncAddr(
     LPVOID pfnPatchedFunction)
 {
     IHI_PATCHED_API_DATA *pPatchedApiArray = mPatchedApiListHead;
@@ -401,7 +401,7 @@ Return:
 
 --*/
 LPCSTR
-C_PATCH_MANAGER::GetFuncNameAt(
+CPatchManager::GetFuncNameAt(
     ULONG inIndex)
 {
     //IHU_DBG_ASSERT(inIndex < mPatchedApiCount);
@@ -416,9 +416,9 @@ C_PATCH_MANAGER::GetFuncNameAt(
 
 
 void
-C_PATCH_MANAGER::GetReturnDataAt(
+CPatchManager::GetFnReturnValueInfoAt(
     ULONG   inIndex,
-    IHI_RETURN_DATA &oReturnData)
+    IHI_FN_RETURN_VALUE &oRetValInfo)
 /*++
 
 Routine Description:
@@ -439,13 +439,13 @@ Return:
 
     IHI_PATCHED_API_DATA *patchedApiArray = GetPatchedApiArrayAt(tableIndex);
 
-    oReturnData = patchedApiArray->mApiData[entryIndex].mReturnData;
+    oRetValInfo = patchedApiArray->mApiData[entryIndex].mReturnData;
     return;
 }
 
 
 void
-C_PATCH_MANAGER::RemoveAllPatches()
+CPatchManager::RemoveAllPatches()
 /*++
 
 Routine Description:
@@ -526,7 +526,7 @@ Return:
 
 --*/
 bool
-C_PATCH_MANAGER::IsModulePatched(
+CPatchManager::IsModulePatched(
     HANDLE inModuleHandle)
 {
     bool bFound = false;
@@ -560,7 +560,7 @@ Return:
 
 --*/
 void
-C_PATCH_MANAGER::AddModuleToPatchedList(
+CPatchManager::AddModuleToPatchedList(
     HANDLE inModuleHandle)
 {
     if (!IsModulePatched(inModuleHandle))
@@ -589,7 +589,7 @@ Return:
 
 --*/
 void
-C_PATCH_MANAGER::RemoveModuleFromPatchedList(
+CPatchManager::RemoveModuleFromPatchedList(
     HANDLE inModuleHandle)
 {
     ULONG moduleIndex = 0;
@@ -633,7 +633,7 @@ Return:
 
 --*/
 HANDLE
-C_PATCH_MANAGER::GetPatchedModulesHandle(
+CPatchManager::GetPatchedModulesHandle(
     ULONG moduleIndex)
 {
     if (moduleIndex < mPatchedModuleCount)
@@ -661,7 +661,7 @@ Return:
 
 --*/
 ULONG
-C_PATCH_MANAGER::GetPatchedModulesCount()
+CPatchManager::GetPatchedModulesCount()
 {
     return mPatchedModuleCount;
 }
@@ -671,14 +671,14 @@ C_PATCH_MANAGER::GetPatchedModulesCount()
 
 Routine Name:
 
-    C_PATCH_INCL_EXCL_MGR
+    CPatchInclExclMgr
 
 Routine Description:
 
     Constructs a Patch Inclusion/Exclusion manager
 
 --*/
-C_PATCH_INCL_EXCL_MGR::C_PATCH_INCL_EXCL_MGR()
+CPatchInclExclMgr::CPatchInclExclMgr()
 {
     m_IncludeList = NULL;
     m_ExcludeList = NULL;
@@ -689,14 +689,14 @@ C_PATCH_INCL_EXCL_MGR::C_PATCH_INCL_EXCL_MGR()
 
 Routine Name:
 
-    ~C_PATCH_INCL_EXCL_MGR
+    ~CPatchInclExclMgr
 
 Routine Description:
 
     Destructs a Patch Inclusion/Exclusion manager
 
 --*/
-C_PATCH_INCL_EXCL_MGR::~C_PATCH_INCL_EXCL_MGR()
+CPatchInclExclMgr::~CPatchInclExclMgr()
 {
     PIHI_MAP pCurrent;
 
@@ -708,8 +708,8 @@ C_PATCH_INCL_EXCL_MGR::~C_PATCH_INCL_EXCL_MGR()
 
         while(pChildCurrent)
         {
-            IHI_RETURN_DATA *pReturnData = (IHI_RETURN_DATA *)pChildCurrent->Value;
-            delete pReturnData;
+            IHI_FN_RETURN_VALUE *pReturnValueInfo = (IHI_FN_RETURN_VALUE *)pChildCurrent->Value;
+            delete pReturnValueInfo;
 
             PIHI_MAP pChildTemp = pChildCurrent;
             pChildCurrent = pChildCurrent->Next;
@@ -761,7 +761,7 @@ Return:
 
 --*/
 void
-C_PATCH_INCL_EXCL_MGR::SetInclExclList(
+CPatchInclExclMgr::SetInclExclList(
     LPCSTR  inFnIncludes,
     LPCSTR  inFnExcludes)
 {
@@ -813,7 +813,7 @@ Return:
 
 --*/
 void
-C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
+CPatchInclExclMgr::BuildInclOrExclList(
     std::string         inFnList,
     PIHI_MAP            *ioMap)
 {
@@ -844,7 +844,7 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
             bool impModuleIsPrefix;
             bool fnNameIsPrefix;
             std::string     retValStr;
-            IHI_RETURN_DATA retValInfo = {0};
+            IHI_FN_RETURN_VALUE retValInfo = {0};
 
             loadedModuleIsPrefix = false;
             impModuleIsPrefix = false;
@@ -896,8 +896,8 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
                     // a return value is specified
                     retValStr = fnInc.substr(i_begin, fnInc.length() - i_begin);
 
-                    retValInfo.Specified    = true;
-                    retValInfo.Value        = (int)strtoul(retValStr.c_str(), NULL, 0);
+                    retValInfo.UserSpecified = true;
+                    retValInfo.Value = (int)strtoul(retValStr.c_str(), NULL, 0);
                 }
             }
 
@@ -926,14 +926,15 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
                 fnNameIsPrefix = true;
             }
 
-            PIHI_MAP            *pImpModuleMap  = NULL;
-            PIHI_MAP            *pFnNameMap     = NULL;
-            IHI_RETURN_DATA     *pReturnData    = NULL;
+            PIHI_MAP *pImpModuleMap  = NULL;
+            PIHI_MAP *pFnNameMap     = NULL;
+            IHI_FN_RETURN_VALUE *pReturnValueInfo    = NULL;
+            IHI_MATCH_DATA matchData;
 
             //
             // Create loaded module entry if it does not exist.
             //
-            if (!ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, MATCH_EXACT, (LPVOID*)&pImpModuleMap, NULL))
+            if (!ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, MATCH_EXACT, &matchData))
             {
                 if (!ihiMapAssign(ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, NULL))
                 {
@@ -944,9 +945,9 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
             //
             // Create import module entry if it does not exist.
             //
-            ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, MATCH_EXACT, (LPVOID*)&pImpModuleMap, NULL);
-
-            if (!ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, MATCH_EXACT, (LPVOID*)&pFnNameMap, NULL))
+            ihiMapFind(*ioMap, (LPCSTR)loadedModule.c_str(), loadedModuleIsPrefix, MATCH_EXACT, &matchData);
+            pImpModuleMap = (PIHI_MAP *)matchData.KeyValue;
+            if (!ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, MATCH_EXACT, &matchData))
             {
                 if (!ihiMapAssign(pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, NULL))
                 {
@@ -957,31 +958,29 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
             //
             // Create function name entry if it does not exist.
             //
-            ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, MATCH_EXACT, (LPVOID*)&pFnNameMap, NULL);
-
-            if (!ihiMapFind(*pFnNameMap, (LPCSTR)fnName.c_str(), fnNameIsPrefix, MATCH_EXACT, (LPVOID*)&pReturnData, NULL))
+            ihiMapFind(*pImpModuleMap, (LPCSTR)impModule.c_str(), impModuleIsPrefix, MATCH_EXACT, &matchData);
+            pFnNameMap = (PIHI_MAP *)matchData.KeyValue;
+            if (!ihiMapFind(*pFnNameMap, (LPCSTR)fnName.c_str(), fnNameIsPrefix, MATCH_EXACT, &matchData))
             {
-                pReturnData = NULL;
+                pReturnValueInfo = NULL;
 
-                if (retValInfo.Specified)
+                if (retValInfo.UserSpecified)
                 {
-                    pReturnData = new IHI_RETURN_DATA;
-
-                    if (pReturnData == NULL)
+                    pReturnValueInfo = new IHI_FN_RETURN_VALUE;
+                    if (pReturnValueInfo == NULL)
                     {
                         return;
                     }
-
-                    memset(pReturnData, 0, sizeof(IHI_RETURN_DATA));
-                    *pReturnData = retValInfo;
+                    memset(pReturnValueInfo, 0, sizeof(IHI_FN_RETURN_VALUE));
+                    *pReturnValueInfo = retValInfo;
                 }
 
-                if (!ihiMapAssign(pFnNameMap, (LPCSTR)fnName.c_str(), fnNameIsPrefix, pReturnData))
+                if (!ihiMapAssign(pFnNameMap, (LPCSTR)fnName.c_str(), fnNameIsPrefix, pReturnValueInfo))
                 {
                     return;
                 }
             }
-        } while(false);
+        } while (false);
 
         index_begin = index_end + 2;
     }
@@ -997,12 +996,12 @@ C_PATCH_INCL_EXCL_MGR::BuildInclOrExclList(
 //
 
 bool
-C_PATCH_INCL_EXCL_MGR::PatchRequired(
+CPatchInclExclMgr::PatchRequired(
     LPCSTR      inLoadedModuleName,
     LPCSTR      inImpModuleName,
     LPCSTR      inFnName,
     bool        inOrdinalExport,
-    IHI_RETURN_DATA *oRetVal)
+    IHI_FN_RETURN_VALUE *oRetValInfo)
 /*++
 
 Routine Description:
@@ -1021,7 +1020,7 @@ Arguments:
 
     inOrdinalExport - Was the function exported by ordinal
 
-    oRetVal - Return value information if a different return value is
+    oRetValInfo - Return value information if a different return value is
         specified by the user
 
 Return:
@@ -1031,20 +1030,26 @@ Return:
 
 --*/
 {
+    bool funcResult = false;
+    int inclWeight = 0;
+    int exclWeight = 0;
+
     IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD,
         L"IsPatchRequired for: %S, %S, %S\n",
         inLoadedModuleName, inImpModuleName, inFnName);
 
-    bool funcResult = false;
-    int inclWeight = 0;
-    int exclWeight = 0;
+    if (ihiPatchAntiDebugFunction(inImpModuleName, inFnName))
+    {
+        funcResult = true;
+        goto Exit;
+    }
 
     inclWeight = CalcWeight(
                         m_IncludeList,
                         inLoadedModuleName,
                         inImpModuleName,
                         inFnName,
-                        oRetVal);
+                        oRetValInfo);
 
     exclWeight = CalcWeight(
                         m_ExcludeList,
@@ -1066,6 +1071,8 @@ Return:
         funcResult = false;
     }
 
+Exit:
+
     if (funcResult)
     {
         if (inFnName != NULL)
@@ -1083,44 +1090,35 @@ Return:
 
 
 ULONG
-C_PATCH_INCL_EXCL_MGR::CalcFnMatchWeight(
+CPatchInclExclMgr::CalcFnMatchWeight(
     PIHI_MAP inFnMap,
     LPCSTR inFnName,
-    LPVOID *oReturnData)
+    LPVOID *oRetValInfo)
 {
-    ULONG fnWeight = 0;
+    IHI_MATCH_DATA matchData = { 0 };
 
-    if (!ihiMapFind(inFnMap, inFnName, false, MATCH_GREEDY, oReturnData, &fnWeight))
-    {
-        ihiMapFind(inFnMap, inFnName, true, MATCH_GREEDY, oReturnData, &fnWeight);
-    }
+    if (!ihiMapFind(inFnMap, inFnName, false, MATCH_EXACT, &matchData))
+        ihiMapFind(inFnMap, inFnName, true, MATCH_LONGEST, &matchData);
 
-    return fnWeight;
+    if (oRetValInfo != NULL)
+        *oRetValInfo = matchData.KeyValue;
+
+    return matchData.MatchValue;
 }
 
 ULONG
-C_PATCH_INCL_EXCL_MGR::CalcImpModuleMatchWeight(
-    PIHI_MAP inImpModuleMap,
-    LPCSTR inImpModuleName,
+CPatchInclExclMgr::CalcImpModuleMatchWeightInternal(
+    PIHI_MATCH_DATA inMatchData,
     LPCSTR inFnName,
-    LPVOID *oReturnData)
+    LPVOID *oRetValInfo)
 {
     PIHI_MAP *pFnNameMap;
     ULONG impModuleWeight = 0;
     ULONG fnWeight = 0;
 
-    if (ihiMapFind(inImpModuleMap, inImpModuleName, false, MATCH_GREEDY, (LPVOID*)&pFnNameMap, &impModuleWeight))
-    {
-        fnWeight = CalcFnMatchWeight(*pFnNameMap, inFnName, oReturnData);
-    }
-
-    if (impModuleWeight == 0 || fnWeight == 0)
-    {
-        if (ihiMapFind(inImpModuleMap, inImpModuleName, true, MATCH_GREEDY, (LPVOID*)&pFnNameMap, &impModuleWeight))
-        {
-            fnWeight = CalcFnMatchWeight(*pFnNameMap, inFnName, oReturnData);
-        }
-    }
+    pFnNameMap = (PIHI_MAP *)inMatchData->KeyValue;
+    impModuleWeight = inMatchData->MatchValue;
+    fnWeight = CalcFnMatchWeight(*pFnNameMap, inFnName, oRetValInfo);
 
     if (impModuleWeight == 0 || fnWeight == 0)
     {
@@ -1131,12 +1129,72 @@ C_PATCH_INCL_EXCL_MGR::CalcImpModuleMatchWeight(
 }
 
 ULONG
-C_PATCH_INCL_EXCL_MGR::CalcWeight(
-    PIHI_MAP            inLoadedModuleMap,
-    LPCSTR              inLoadedModuleName,
-    LPCSTR              inImpModuleName,
-    LPCSTR              inFnName,
-    IHI_RETURN_DATA     *oRetVal)
+CPatchInclExclMgr::CalcImpModuleMatchWeight(
+    PIHI_MAP inImpModuleMap,
+    LPCSTR inImpModuleName,
+    LPCSTR inFnName,
+    LPVOID *oRetValInfo)
+{
+    IHI_MATCH_DATA matchData = { 0 };
+    ULONG impModuleWeight = 0;
+    PIHI_MATCH_DATA matchDataPtr;
+
+    if (ihiMapFind(inImpModuleMap, inImpModuleName, false, MATCH_EXACT, &matchData))
+    {
+        impModuleWeight = CalcImpModuleMatchWeightInternal(&matchData, inFnName, oRetValInfo);
+    }
+
+    if (impModuleWeight == 0)
+    {
+        if (ihiMapFind(inImpModuleMap, inImpModuleName, true, MATCH_ALL, &matchData))
+        {
+            ULONG tmpImpWeight = 0;
+            LPVOID tmpRetValInfo;
+            for (matchDataPtr = &matchData; matchDataPtr != NULL; matchDataPtr = matchDataPtr->Next)
+            {
+                tmpImpWeight = CalcImpModuleMatchWeightInternal(matchDataPtr, inFnName, &tmpRetValInfo);
+                if (tmpImpWeight > impModuleWeight)
+                {
+                    impModuleWeight = tmpImpWeight;
+                    if (oRetValInfo != NULL)
+                        *oRetValInfo = tmpRetValInfo;
+                }
+            }
+        }
+    }
+
+    return impModuleWeight;
+}
+
+ULONG
+CPatchInclExclMgr::CalcTotalWeight(
+    PIHI_MATCH_DATA inMatchData,
+    LPCSTR inImpModuleName,
+    LPCSTR inFnName,
+    LPVOID *oRetValInfo)
+{
+    PIHI_MAP *pImpModuleMap;
+    ULONG loadedModuleWeight = 0;
+    ULONG impModuleWeight = 0;
+
+    pImpModuleMap = (PIHI_MAP *)inMatchData->KeyValue;
+    loadedModuleWeight = inMatchData->MatchValue;
+    impModuleWeight = CalcImpModuleMatchWeight(*pImpModuleMap, inImpModuleName, inFnName, oRetValInfo);
+
+    if (loadedModuleWeight == 0 || impModuleWeight == 0)
+        return 0;
+
+    return loadedModuleWeight + impModuleWeight;
+    
+}
+
+ULONG
+CPatchInclExclMgr::CalcWeight(
+    PIHI_MAP inLoadedModuleMap,
+    LPCSTR inLoadedModuleName,
+    LPCSTR inImpModuleName,
+    LPCSTR inFnName,
+    IHI_FN_RETURN_VALUE *oRetValInfo)
 /*++
 
 Routine Description:
@@ -1154,7 +1212,7 @@ Arguments:
     inFnName - Name of the function (for functions exported by ordinal
         this name is Ord%x)
 
-    oRetVal - Optional return value information for the best match
+    oRetValInfo - Optional return value information for the best match
 
     inLoadedModuleMap - reference to the map (or graph) for either included
         functions or excluded functions
@@ -1164,35 +1222,40 @@ Return:
     int - a number representing the weight of the function
 
 --*/
-{   
-    PIHI_MAP *pImpModuleMap;
-    PIHI_RETURN_DATA *pReturnData;
-    ULONG loadedModuleWeight = 0;
-    ULONG impModuleWeight = 0;
+{
+    ULONG totalWeight = 0;
+    PIHI_FN_RETURN_VALUE *pReturnValueInfo = NULL;
+    IHI_MATCH_DATA matchData = { 0 };
+    PIHI_MATCH_DATA matchDataPtr;
 
-    if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, false, MATCH_GREEDY, (LPVOID*)&pImpModuleMap, &loadedModuleWeight))
+    if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, false, MATCH_EXACT, &matchData))
     {
-        impModuleWeight = CalcImpModuleMatchWeight(*pImpModuleMap, inImpModuleName, inFnName, (LPVOID*)&pReturnData);
+        totalWeight = CalcTotalWeight(&matchData, inImpModuleName, inFnName, (LPVOID*)pReturnValueInfo);
     }
 
-    if (loadedModuleWeight == 0 || impModuleWeight == 0)
+    if (totalWeight == 0)
     {
-        if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, true, MATCH_GREEDY, (LPVOID*)&pImpModuleMap, &loadedModuleWeight))
+        if (ihiMapFind(inLoadedModuleMap, inLoadedModuleName, true, MATCH_ALL, &matchData))
         {
-            impModuleWeight = CalcImpModuleMatchWeight(*pImpModuleMap, inImpModuleName, inFnName, (LPVOID*)&pReturnData);
+            ULONG tmpTotalWeight = 0;
+            LPVOID tmpRetValInfo;
+            for (matchDataPtr = &matchData; matchDataPtr != NULL; matchDataPtr = matchDataPtr->Next)
+            {
+                tmpTotalWeight = CalcTotalWeight(matchDataPtr, inImpModuleName, inFnName, &tmpRetValInfo);
+                if (tmpTotalWeight > totalWeight)
+                {
+                    totalWeight = tmpTotalWeight;
+                    pReturnValueInfo = (PIHI_FN_RETURN_VALUE*)tmpRetValInfo;
+                }
+            }
         }
     }
 
-    if (loadedModuleWeight == 0 || impModuleWeight == 0)
+    if (oRetValInfo && pReturnValueInfo && *pReturnValueInfo)
     {
-        return 0;
+        *oRetValInfo = **pReturnValueInfo;
     }
 
-    if (oRetVal && *pReturnData)
-    {
-        *oRetVal = **pReturnData;
-    }
-
-    return loadedModuleWeight + impModuleWeight;
+    return totalWeight;
 }
 

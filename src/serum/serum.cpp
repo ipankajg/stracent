@@ -65,7 +65,6 @@ LONG gThreadReferenceCount;
 // Representation of command line options.
 //
 bool gEnableAntiDebugMeasures = false;
-ULONG gLoggingLevel = IHU_LEVEL_LOUD;
 
 typedef struct _ST_TRACE_OPTIONS {
     bool EnableAntiDebugMeasures;
@@ -103,6 +102,13 @@ WINAPI
 IhSerumLoad(PVOID inContext, ULONG inContextSize)
 {
     PST_TRACE_OPTIONS trcOptions;
+
+    _asm push eax;
+    _asm mov eax, 1;
+debug:
+    _asm cmp eax, 0;
+    _asm je debug;
+    _asm pop eax;
     
     trcOptions = (PST_TRACE_OPTIONS)inContext;
     //
@@ -113,8 +119,8 @@ IhSerumLoad(PVOID inContext, ULONG inContextSize)
     IhuSetDbgLogLevel(trcOptions->LoggingLevel);
 
     if (trcOptions->EnableAntiDebugMeasures)
-    {
-        ihiDisableAntiDebugMeasures();
+    {   
+        ihiEnableAntiDebugMeasures();
     }
 
     char szModuleName[MAX_PATH] = {0};

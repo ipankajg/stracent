@@ -26,12 +26,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --*/
 
-/*++
-
-    Declares structures and functions for serum DLL.
-
---*/
-
+// 
+// Declares structures and functions for serum DLL.
+//
 
 #ifndef _SERUM_H_
 #define _SERUM_H_
@@ -131,7 +128,6 @@ void
 WINAPI
 ihiPatchUnpatchModules(HINSTANCE hDll, bool inApplyHook);
 
-
 void
 WINAPI
 ihiRemoveUnloadedModules();
@@ -169,12 +165,12 @@ ihiToUpper(char c);
 // Store information about the return value of an API, if user specified
 // this information in the filter file
 //
-typedef struct _IHI_RETURN_DATA
+typedef struct _IHI_FN_RETURN_VALUE
 {
-    bool    Specified;
+    bool    UserSpecified;
     int     Value;
 
-} IHI_RETURN_DATA, *PIHI_RETURN_DATA;
+} IHI_FN_RETURN_VALUE, *PIHI_FN_RETURN_VALUE;
 
 
 //
@@ -189,7 +185,7 @@ typedef struct _IHI_API_DATA
     PVOID               mOriginalAddress;
 
     // If user specified a different return value, save it here
-    IHI_RETURN_DATA     mReturnData;
+    IHI_FN_RETURN_VALUE mReturnValue;
 
 }IHI_API_DATA;
 
@@ -215,22 +211,6 @@ typedef struct _IHI_PATCHED_API_DATA
 
 }IHI_PATCHED_API_DATA;
 
-
-//
-// Utilities to handle PE image's import/export tables.
-//
-LPVOID ihiGetPtrFromRVA(DWORD relVA, PIMAGE_NT_HEADERS inINTH,
-    DWORD inBaseAddress);
-
-BOOL ihiGetFileImportDescriptor(LPCWSTR fileName, PIMAGE_NT_HEADERS *INTHPtr,
-    PIMAGE_IMPORT_DESCRIPTOR *IIDPtr, PBYTE *BaseAddress);
-
-BOOL ihiGetModuleImportDescriptor(PBYTE inModuleBaseAddress, LPCSTR inModuleBaseName,
-    PIMAGE_NT_HEADERS *INTHPtr, PIMAGE_IMPORT_DESCRIPTOR *IIDPtr);
-
-BOOL ihiGetExportedFunctionName(LPCWSTR inModuleName, WORD inOrdinal,
-    LPSTR outFnName, DWORD inFnNameSize);
-
 //
 // Data structures to manage inclusion/exclusion of functions
 //
@@ -243,46 +223,55 @@ typedef struct _IHI_MAP
     LPVOID              Value;
     struct _IHI_MAP     *Next;
 
-}IHI_MAP, *PIHI_MAP;
+} IHI_MAP, *PIHI_MAP;
+
+struct InclExclRule
+{
+    string LoadedModuleName;
+    string ImportedModuleName;
+    string FunctionName;
+    IHI_FN_RETURN_VALUE ReturnValue;
+};
+
+typedef vector<InclExclRule> InclExclRuleList;
 
 void
-ihiMapDump(PIHI_MAP inMap, LPCWSTR inTitle); 
+ihiMapDump(PIHI_MAP inMap, LPCWSTR inTitle);
 
 enum IHI_PREFIX_MATCH_MODE
 {
     MATCH_EXACT,
-    MATCH_GREEDY
+    MATCH_LONGEST,
+    MATCH_ALL
 };
 
-bool
-ihiMapFind(
-    IHI_MAP     *inMap,
-    LPCSTR      inKey,
-    bool        inDoPrefixMatch,
-    IHI_PREFIX_MATCH_MODE inMatchMode,
-    LPVOID      *oValue,
-    PULONG      oMatchValue);
+struct _IHI_MATCH_DATA;
+typedef struct _IHI_MATCH_DATA
+{
+    LPVOID KeyValue;
+    ULONG MatchValue;
+    struct _IHI_MATCH_DATA *Next;
+} IHI_MATCH_DATA, *PIHI_MATCH_DATA;
 
+bool
+ihiMapFind(PIHI_MAP inMap, LPCSTR inKey, bool inMatchTypePrefix,
+           IHI_PREFIX_MATCH_MODE inPrefixMatchMode, PIHI_MATCH_DATA oMatchData);
 
 bool
 ihiMapAssign(PIHI_MAP *ioMap, LPCSTR inKey, bool inIsPrefix, LPVOID inValue);
 
-VOID
-ihiDisableAntiDebugMeasures();
-
-
 //
 // Patch manager class
 //
-class C_PATCH_MANAGER
+class CPatchManager
 {
 public:
 
     // Constructor
-    C_PATCH_MANAGER();
+    CPatchManager();
 
     // Destructor
-    ~C_PATCH_MANAGER();
+    ~CPatchManager();
 
 
     void
@@ -315,15 +304,15 @@ public:
         ULONG inIndex);
 
     void
-        GetReturnDataAt(
+        GetFnReturnValueInfoAt(
         ULONG   inIndex,
-        IHI_RETURN_DATA &oReturnData);
+        IHI_FN_RETURN_VALUE &oRetValInfo);
 
     LPVOID
         InsertNewPatch(
         LPSTR           inApiName,
         LPVOID          inOrigFuncAddr,
-        IHI_RETURN_DATA &inRetValInfo);
+        IHI_FN_RETURN_VALUE &inRetValInfo);
 
     void
         RemoveAllPatches();
@@ -375,18 +364,18 @@ private:
 //
 // global object to manage patched functions
 //
-extern C_PATCH_MANAGER  gPatchManager;
+extern CPatchManager  gPatchManager;
 
 //
 // Class to manage inclusion/exclusion list for patching
 //
-class C_PATCH_INCL_EXCL_MGR
+class CPatchInclExclMgr
 {
 public:
 
     // Constructor/Destructor
-    C_PATCH_INCL_EXCL_MGR();
-    ~C_PATCH_INCL_EXCL_MGR();
+    CPatchInclExclMgr();
+    ~CPatchInclExclMgr();
 
     // Functions
     void
@@ -405,7 +394,7 @@ public:
         LPCSTR      impModuleName,
         LPCSTR      fnName,
         bool            inOrdinalExport,
-        IHI_RETURN_DATA *oRetVal);
+        IHI_FN_RETURN_VALUE *oRetVal);
 
     ULONG
         CalcWeight(
@@ -413,30 +402,106 @@ public:
         LPCSTR              inLoadedModuleName,
         LPCSTR              inImpModuleName,
         LPCSTR              inFnName,
-        IHI_RETURN_DATA     *oRetVal);
+        IHI_FN_RETURN_VALUE     *oRetVal);
+
+    ULONG
+        CalcTotalWeight(
+        PIHI_MATCH_DATA inMatchData,
+        LPCSTR inImpModuleName,
+        LPCSTR inFnName,
+        LPVOID *oRetValInfo);
 
     ULONG
         CalcFnMatchWeight(
         PIHI_MAP inFnMap,
         LPCSTR inFnName,
-        LPVOID *oReturnData);
+        LPVOID *oRetValInfo);
 
     ULONG
         CalcImpModuleMatchWeight(
         PIHI_MAP inImpModuleMap,
         LPCSTR inImpModuleName,
         LPCSTR inFnName,
-        LPVOID *oReturnData);
+        LPVOID *oRetValInfo);
+
+    ULONG
+        CalcImpModuleMatchWeightInternal(
+        PIHI_MATCH_DATA inMatchData,
+        LPCSTR inFnName,
+        LPVOID *oRetValInfo);
 
 private:
-    PIHI_MAP        m_IncludeList;
-    PIHI_MAP        m_ExcludeList;
+    PIHI_MAP            m_IncludeList;
+    PIHI_MAP            m_ExcludeList;
+    InclExclRuleList    m_IncludeRuleList;
+    InclExclRuleList    m_ExcludeRuleList;
 };
 
 
 //
 // global object to manage inclusion/exclusion
 //
-extern C_PATCH_INCL_EXCL_MGR gPatchInclExclMgr;
+extern CPatchInclExclMgr gPatchInclExclMgr;
+
+//
+// Utilities to handle PE image's import/export tables.
+//
+
+class CMappedFileObject
+{
+public:
+    CMappedFileObject()
+    {
+        m_FileHandle = INVALID_HANDLE_VALUE;
+        m_FileMappingHandle = NULL;
+        m_MappedBaseAddress = NULL;
+    }
+    ~CMappedFileObject()
+    {
+        if (m_MappedBaseAddress != NULL)
+        {
+            UnmapViewOfFile(m_MappedBaseAddress);
+            CloseHandle(m_FileMappingHandle);
+            CloseHandle(m_FileHandle);
+        }
+    }
+
+    BOOL Initialize(LPCWSTR inFileName);
+    LPBYTE GetMappedBaseAddress()
+    {
+        return m_MappedBaseAddress;
+    }
+    LPCWSTR GetFileName()
+    {
+        return m_FileName.c_str();
+    }
+
+private:
+    HANDLE m_FileHandle;
+    HANDLE m_FileMappingHandle;
+    LPBYTE m_MappedBaseAddress;
+    wstring m_FileName;
+};
+
+LPVOID ihiGetPtrFromRVA(DWORD relVA, PIMAGE_NT_HEADERS inINTH,
+    DWORD inBaseAddress);
+
+BOOL ihiGetFileImportDescriptor(CMappedFileObject &inFileObject, PIMAGE_NT_HEADERS *INTHPtr,
+    PIMAGE_IMPORT_DESCRIPTOR *IIDPtr);
+
+BOOL ihiGetModuleImportDescriptor(PBYTE inModuleBaseAddress, LPCSTR inModuleBaseName,
+    PIMAGE_NT_HEADERS *INTHPtr, PIMAGE_IMPORT_DESCRIPTOR *IIDPtr);
+
+BOOL ihiGetExportedFunctionName(LPCWSTR inModuleName, WORD inOrdinal,
+    LPSTR outFnName, DWORD inFnNameSize);
+
+extern bool gEnableAntiDebugMeasures;
+
+VOID
+ihiEnableAntiDebugMeasures();
+
+BOOL
+ihiPatchAntiDebugFunction(LPCSTR inModuleName, LPCSTR inFnName);
+
 
 #endif

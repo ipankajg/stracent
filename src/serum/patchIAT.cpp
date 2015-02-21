@@ -48,12 +48,12 @@ bool gDebug = false;
 //
 // Used to manage all the patching related house keeping information.
 //
-C_PATCH_MANAGER gPatchManager;
+CPatchManager gPatchManager;
 
 //
 // Used to manage patch inclusion/exclusion list.
 //
-C_PATCH_INCL_EXCL_MGR gPatchInclExclMgr;
+CPatchInclExclMgr gPatchInclExclMgr;
 
 
 typedef enum _PROCESSINFOCLASS {
@@ -255,12 +255,12 @@ ihiPatchedFuncEntry(
     //
     // Used to store return value of original API
     //
-    PVOID valueReturn = NULL;
+    PVOID returnValue = NULL;
 
     //
     // Modified return value if any
     //
-    IHI_RETURN_DATA returnData = {0};
+    IHI_FN_RETURN_VALUE returnValueInfo = {0};
 
     //
     // Used to store the error code of original API
@@ -362,7 +362,7 @@ ihiPatchedFuncEntry(
         mov     edx,        inEDX
     }
 
-    valueReturn = (*pOrgFunc)();
+    returnValue = (*pOrgFunc)();
 
     //
     // At this point, esp is messed up because
@@ -386,20 +386,20 @@ ihiPatchedFuncEntry(
     //
     errorCode = GetLastError();
 
-    gPatchManager.GetReturnDataAt(dwId, returnData);
+    gPatchManager.GetFnReturnValueInfoAt(dwId, returnValueInfo);
 
-    if (returnData.Specified)
+    if (returnValueInfo.UserSpecified)
     {
         sprintf(    szStr,
                     "$= %x -> %x\n",
-                    valueReturn,
-                    returnData.Value);
+                    returnValue,
+                    returnValueInfo.Value);
     }
     else
     {
         sprintf(    szStr,
                     "$= %x\n",
-                    valueReturn);
+                    returnValue);
     }
 
     //
@@ -409,51 +409,56 @@ ihiPatchedFuncEntry(
 
     if (_stricmp(funcName, "IsDebuggerPresent") == 0)
     {
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
-                       L"AntiDebug: Modifying IsDebuggerPresent return from: %x -> 0\n",
-                       valueReturn);
-        valueReturn = 0;
+        if (gEnableAntiDebugMeasures)
+        {
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+                L"AntiDebug: Modifying IsDebuggerPresent return from: %x -> 0\n",
+                returnValue);
+            returnValue = 0;
+        }
     }
     else if (_stricmp(funcName, "CheckRemoteDebuggerPresent") == 0)
     {
-        PBOOL pbDebuggerPresent = (PBOOL)(*(pFirstParam + 1));
-        if (pbDebuggerPresent != NULL)
+        if (gEnableAntiDebugMeasures)
         {
-            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
-                           L"AntiDebug: Modifying DebuggerPresent from: %x -> 0\n",
-                           *pbDebuggerPresent);
+            PBOOL pbDebuggerPresent = (PBOOL)(*(pFirstParam + 1));
+            if (pbDebuggerPresent != NULL)
+            {
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+                    L"AntiDebug: Modifying DebuggerPresent from: %x -> 0\n",
+                    *pbDebuggerPresent);
 
-            *pbDebuggerPresent = FALSE;
+                *pbDebuggerPresent = FALSE;
+            }
         }
     }
     else if (_stricmp(funcName, "NtQueryInformationProcess") == 0 ||
              _stricmp(funcName, "ZwQueryInformationProcess") == 0)
     {
-        PROCESSINFOCLASS processInformationClass = (PROCESSINFOCLASS)(*(pFirstParam + 1));
-        LPDWORD debugPort = (LPDWORD)(*(pFirstParam + 2));
-
-        IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FATAL, L"PROCESSINFOCLASS: %x\n", processInformationClass);
-        if (processInformationClass == ProcessDebugPort)
+        if (gEnableAntiDebugMeasures)
         {
-            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
-                L"AntiDebug: Modifying DebugPort from: %x -> 0\n",
-                *debugPort);
+            PROCESSINFOCLASS processInformationClass = (PROCESSINFOCLASS)(*(pFirstParam + 1));
+            LPDWORD debugPort = (LPDWORD)(*(pFirstParam + 2));
 
-            *debugPort = 0;
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD, L"PROCESSINFOCLASS: %x\n", processInformationClass);
+            if (processInformationClass == ProcessDebugPort)
+            {
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
+                    L"AntiDebug: Modifying DebugPort from: %x -> 0\n",
+                    *debugPort);
+
+                *debugPort = 0;
+            }
         }
     }
-    else if (   valueReturn != NULL &&
-                (strstr(funcName, "LoadLibrary") == funcName))
+    else if (returnValue != NULL && (strstr(funcName, "LoadLibrary") == funcName))
     {
         //
         // Some new modules might be loaded. Let us patch it
         //
-        ihiPatchUnpatchModules(
-                        g_hInstance,
-                        true);
+        ihiPatchUnpatchModules(g_hInstance, true);
     }
-    else if (   valueReturn != 0 &&
-                strcmp(funcName, "FreeLibrary") == 0)
+    else if (returnValue != 0 && strcmp(funcName, "FreeLibrary") == 0)
     {
         //
         // FreeLibrary may cause the DLL reference count
@@ -468,8 +473,7 @@ ihiPatchedFuncEntry(
         //
         ihiRemoveUnloadedModules();
     }
-    else if (   valueReturn != NULL &&
-                strcmp(funcName, "GetProcAddress") == 0)
+    else if (returnValue != NULL && strcmp(funcName, "GetProcAddress") == 0 && 0)
     //
     // For now patching of functions found via GetProcAddress is disabled by
     // adding && 0. This is done because if we patch the functions returned
@@ -477,8 +481,7 @@ ihiPatchedFuncEntry(
     // to fail to load any page. I don't have interest to fix this issue right
     // now so i am disabling the feature for the time being
     //
-    // TODO
-    // Fix this problem sometime
+    // TODO: Fix this problem sometime.
     //
     {
         char szModuleName[MAX_PATH] = {0};
@@ -504,19 +507,18 @@ ihiPatchedFuncEntry(
                 exportedByOrdinal = true;
             }
 
-            IHI_RETURN_DATA returnData = {0};
-            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FATAL, L"IsPatchRequired for: %S\n", fnName);
-            if (gPatchInclExclMgr.PatchRequired("", szModuleName, fnName, exportedByOrdinal, &returnData))
+            IHI_FN_RETURN_VALUE returnValueInfo = {0};
+            IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"IsPatchRequired for: %S\n", fnName);
+            if (gPatchInclExclMgr.PatchRequired("", szModuleName, fnName, exportedByOrdinal, &returnValueInfo))
             {
                 gPatchManager.Lock();
-
+                
                 IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Inserting hook for %S:%S\n", szModuleName, fnName);
 
-                LPVOID pfnNew = gPatchManager.InsertNewPatch(fnName, valueReturn, returnData);
-
+                LPVOID pfnNew = gPatchManager.InsertNewPatch(fnName, returnValue, returnValueInfo);
                 if (pfnNew != NULL)
                 {
-                    valueReturn = pfnNew;
+                    returnValue = pfnNew;
                 }
 
                 gPatchManager.UnLock();
@@ -533,11 +535,11 @@ ihiPatchedFuncEntry(
     }
 
     //
-    // Change valueReturn to modified return value
+    // Change returnValue to modified return value
     //
-    if (returnData.Specified)
+    if (returnValueInfo.UserSpecified)
     {
-        valueReturn = (PVOID)returnData.Value;
+        returnValue = (PVOID)returnValueInfo.Value;
     }
 
     //
@@ -573,7 +575,7 @@ ihiPatchedFuncEntry(
     // Set the registers for use in ihiPatchProlog
     __asm
     {
-        mov     eax,    valueReturn
+        mov     eax,    returnValue
         mov     edx,    dwESPDiff
     }
 
@@ -619,8 +621,9 @@ ihiPatchUnpatchImports(
     PIMAGE_IMPORT_DESCRIPTOR    pIID;
     PIMAGE_NT_HEADERS           pINTH_File;
     PIMAGE_IMPORT_DESCRIPTOR    pIID_File;
-    PBYTE                       moduleBaseAddress;
-    PBYTE                       moduleBaseAddress_File;
+    LPBYTE moduleBaseAddress;
+    LPBYTE moduleBaseAddress_File;
+    CMappedFileObject peFileObject;
     DWORD                       dwTemp;
     DWORD                       dwOldProtect;
     LPSTR                       pszModule;
@@ -646,9 +649,13 @@ ihiPatchUnpatchImports(
         fileName[MAX_PATH] = L'\0';
         if (GetModuleFileName(GetModuleHandle(NULL), fileName, MAX_PATH))
         {
-            if (ihiGetFileImportDescriptor(fileName, &pINTH_File, &pIID_File, &moduleBaseAddress_File))
+            if (peFileObject.Initialize(fileName))
             {
-                fileIIDAvailable = TRUE;
+                moduleBaseAddress_File = peFileObject.GetMappedBaseAddress();
+                if (ihiGetFileImportDescriptor(peFileObject, &pINTH_File, &pIID_File))
+                {
+                    fileIIDAvailable = TRUE;
+                }
             }
         }
     }
@@ -775,8 +782,8 @@ ihiPatchUnpatchImports(
                     // exclude all the APIs here that cause problems with
                     // patching.
                     //
-                    IHI_RETURN_DATA returnData = {0};
-                    if (gPatchInclExclMgr.PatchRequired(inModuleBaseName, pszModule, fnName, exportedByOrdinal, &returnData))
+                    IHI_FN_RETURN_VALUE returnValueInfo = {0};
+                    if (gPatchInclExclMgr.PatchRequired(inModuleBaseName, pszModule, fnName, exportedByOrdinal, &returnValueInfo))
                     {
                         IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD, L"Thunking -> %S of %s.\n", fnName, pwszModule);
 
@@ -784,7 +791,7 @@ ihiPatchUnpatchImports(
                         // with our hook function address
                         if (VirtualProtect(&pITDA->u1.Function, sizeof(DWORD), PAGE_READWRITE, &dwOldProtect))
                         {
-                            pfnNew = gPatchManager.InsertNewPatch(fnName, pfnOld, returnData);
+                            pfnNew = gPatchManager.InsertNewPatch(fnName, pfnOld, returnValueInfo);
 
                             if (pfnNew)
                             {
