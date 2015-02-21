@@ -49,6 +49,8 @@ Module Description:
 #include <fstream>
 #include "ihulib.h"
 #include "stres.h"
+#include "stver.h"
+#include "stcmn.h"
 #include "strace.h"
 
 #define ERR_INJDLL_ERROR_BASE       0x20001000
@@ -77,7 +79,7 @@ DWORD gProcessId;
 //
 // Variable to indicate if we should remove patching on exit or not
 //
-bool gRemovePatchOnExit = true;
+bool gEnableDebugging = false;
 
 //
 // Global path of the injector DLL
@@ -104,21 +106,14 @@ ULONG gLoggingLevel = IHU_LEVEL_ERROR;
 // Actions list based on the command line supplied
 // by the user
 //
-typedef enum _COMMAND_LINE_ACTION {
+typedef enum _COMMAND_LINE_ACTION
+{
     CMD_TRACE_NONE,
     CMD_TRACE_HELP,
     CMD_TRACE_BY_PID,
     CMD_TRACE_BY_PNAME,
     CMD_TRACE_NEW_PROC
 } COMMAND_LINE_ACTION;
-
-typedef struct _ST_TRACE_OPTIONS {
-    bool EnableAntiDebugMeasures;
-    ULONG LoggingLevel;
-    ULONG IncludeListOffset;
-    ULONG ExcludeListOffset;
-} ST_TRACE_OPTIONS, *PST_TRACE_OPTIONS;
-
 
 //
 // typedef for XP/2K3 specific DebugSetProcessKillOnExit function
@@ -154,14 +149,9 @@ Routine Description:
 
 --*/
 {
-    if (gRemovePatchOnExit)
+    if (!gEnableDebugging && (ghProcess != INVALID_HANDLE_VALUE))
     {
-        if (ghProcess != INVALID_HANDLE_VALUE)
-        {
-            IhuUninjectDll(
-                    ghProcess,
-                    (LPCWSTR)gInjectorDllPath.c_str());
-        }
+        IhuUninjectDll(ghProcess, (LPCWSTR)gInjectorDllPath.c_str());
     }
 
     gView->PrintMessage(L"Tracing of the process stopped.\n");
@@ -392,65 +382,51 @@ Arguments:
 
                             if (!processInfected)
                             {
-                                if (gRemovePatchOnExit)
-                                {
-                                    HRSRC       hRes;
-                                    HGLOBAL     hResG;
-                                    LPVOID      pRes;
-                                    DWORD       dwResSize;
+                                HRSRC       hRes;
+                                HGLOBAL     hResG;
+                                LPVOID      pRes;
+                                DWORD       dwResSize;
 
-                                    hRes = FindResource(
+                                hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_BIN_DLL), L"BIN");
+                                hResG       = LoadResource(NULL, hRes);
+                                pRes        = LockResource(hResG);
+                                dwResSize   = SizeofResource(NULL, hRes);
+
+                                wchar_t tempPath[MAX_PATH];
+                                wchar_t tempFile[MAX_PATH];
+                                GetTempPath(MAX_PATH, tempPath);
+                                GetTempFileName(tempPath, L"", 0, tempFile);
+
+                                gInjectorDllPath = tempFile;
+
+                                HANDLE oFile = CreateFile(
+                                                    gInjectorDllPath.c_str(),
+                                                    GENERIC_READ | GENERIC_WRITE,
+                                                    0,
                                                     NULL,
-                                                    MAKEINTRESOURCE(IDR_BIN_DLL),
-                                                    L"BIN");
+                                                    CREATE_ALWAYS,
+                                                    FILE_ATTRIBUTE_NORMAL,
+                                                    NULL);
 
-                                    hResG       = LoadResource(NULL, hRes);
-                                    pRes        = LockResource(hResG);
-                                    dwResSize   = SizeofResource(NULL, hRes);
-
-                                    wchar_t tempPath[MAX_PATH];
-                                    wchar_t tempFile[MAX_PATH];
-                                    GetTempPath(MAX_PATH, tempPath);
-                                    GetTempFileName(tempPath, L"", 0, tempFile);
-
-                                    gInjectorDllPath = tempFile;
-
-                                    HANDLE oFile = CreateFile(
-                                                        gInjectorDllPath.c_str(),
-                                                        GENERIC_READ | GENERIC_WRITE,
-                                                        0,
-                                                        NULL,
-                                                        CREATE_ALWAYS,
-                                                        FILE_ATTRIBUTE_NORMAL,
-                                                        NULL);
-
-                                    if (oFile == INVALID_HANDLE_VALUE)
-                                    {
-                                        gView->PrintError(
-                                                L"Failed to create the temporary DLL [%s]. Error code = %x\n",
-                                                gInjectorDllPath.c_str(),
-                                                GetLastError());
-                                        return;
-                                    }
-
-                                    DWORD bytesWritten;
-
-                                    if (!WriteFile(
-                                                oFile,
-                                                pRes,
-                                                dwResSize,
-                                                &bytesWritten,
-                                                NULL))
-                                    {
-                                        gView->PrintError(
-                                                L"Failed to write the temporary DLL. Error code = %x\n",
-                                                GetLastError());
-                                        return;
-                                    }
-
-                                    CloseHandle(oFile);
+                                if (oFile == INVALID_HANDLE_VALUE)
+                                {
+                                    gView->PrintError(
+                                            L"Failed to create the temporary DLL [%s]. Error code = %x\n",
+                                            gInjectorDllPath.c_str(),
+                                            GetLastError());
+                                    return;
                                 }
-                                else
+
+                                DWORD bytesWritten;
+                                if (!WriteFile(oFile, pRes, dwResSize, &bytesWritten, NULL))
+                                {
+                                    gView->PrintError(
+                                            L"Failed to write the temporary DLL. Error code = %x\n",
+                                            GetLastError());
+                                    return;
+                                }
+                                CloseHandle(oFile);
+#if 0
                                 {
                                     wchar_t exePath[MAX_PATH];
 
@@ -470,7 +446,7 @@ Arguments:
                                         gInjectorDllPath = dllPath;
                                     }
                                 }
-
+#endif
                                 //
                                 // Create the parameter block and pass it to IhuInjectDll
                                 //
@@ -497,6 +473,7 @@ Arguments:
                                 memset(trcOptions, 0, trcOptionsSize); 
 
                                 trcOptions->EnableAntiDebugMeasures = gEnableAntiDebugMeasures;
+                                trcOptions->EnableDebugging = gEnableDebugging;
                                 trcOptions->LoggingLevel = gLoggingLevel;
                                 trcOptions->IncludeListOffset = sizeof(ST_TRACE_OPTIONS);
                                 trcOptions->ExcludeListOffset = trcOptions->IncludeListOffset + incListSize;
@@ -630,7 +607,7 @@ Arguments:
     // If we need to remove the patching on exit, it means we created a
     // temporary injector dll, we should delete that now
     //
-    if (gRemovePatchOnExit)
+    if (!gEnableDebugging)
     {
         DeleteFile(gInjectorDllPath.c_str());
     }
@@ -662,7 +639,7 @@ Routine Description:
     // First thing is to initialize all global variables
     //
     ghProcess           = INVALID_HANDLE_VALUE;
-    gRemovePatchOnExit  = true;
+    gEnableDebugging    = false;
     gInjectorDllPath    = L"";
 
     COMMAND_LINE_ACTION userAction = CMD_TRACE_NONE;
@@ -679,8 +656,9 @@ Routine Description:
     //
     IhuSetDbgLogLevel(IHU_LEVEL_INFO);
 
-    gView->PrintTitle(L"\nIntellectualHeaven (R) System Call Tracer for XP, 2K3, Vista and Windows 7.\n");
-    gView->PrintTitle(L"Copyright (C) Pankaj Garg. All rights reserved.\n\n");
+    gView->PrintTitle(L"\n%S (Version: %S)\n", PRODUCT_NAME, ST_MAKE_STR(STRACE_STR_VERSION));
+    gView->PrintTitle(L"%S\n", LEGAL_COPYRIGHT);
+    gView->PrintTitle(L"All rights reserved.\n\n");
 
 
     // We start with index 1 because 0 is the process name
@@ -703,7 +681,7 @@ Routine Description:
         else if (   _wcsicmp(argV[indexArgs], L"-$") == 0 ||
                     _wcsicmp(argV[indexArgs], L"/$") == 0)
         {
-            gRemovePatchOnExit = false;
+            gEnableDebugging = true;
         }
         else if (_wcsicmp(argV[indexArgs], L"-e") == 0 ||
                  _wcsicmp(argV[indexArgs], L"/e") == 0)

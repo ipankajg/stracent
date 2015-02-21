@@ -49,7 +49,7 @@ BEGIN
             VALUE "ProductName",     PRODUCT_NAME
             VALUE "ProductVersion",  ST_MAKE_STR(STRACE_STR_VERSION)
             VALUE "FileVersion",     ST_MAKE_STR(STRACE_STR_VERSION)
-            VALUE "FileDescription", "StraceNt Code Patching Library\0"
+            VALUE "FileDescription", "StraceNT Code Patching Library\0"
             VALUE "OriginalFilename","stserum.dll\0"
             VALUE "InternalName",    "stserum.dll\0"
         END

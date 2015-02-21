@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vector>
 #include <psapi.h>
 #include "ihulib.h"
+#include "stcmn.h"
 
 #define TRC_PATCHIAT IHU_LOGGING_ON
 #define TRC_INJECTOR IHU_LOGGING_ON
@@ -453,6 +454,7 @@ BOOL ihiGetExportedFunctionName(LPCWSTR inModuleName, WORD inOrdinal,
     LPSTR outFnName, DWORD inFnNameSize);
 
 extern bool gEnableAntiDebugMeasures;
+extern BOOL gDebug;
 
 VOID
 ihiEnableAntiDebugMeasures();
@@ -460,5 +462,7 @@ ihiEnableAntiDebugMeasures();
 BOOL
 ihiPatchAntiDebugFunction(LPCSTR inModuleName, LPCSTR inFnName);
 
+VOID
+ihiDebugLoop(BOOL inEnterLoop);
 
 #endif

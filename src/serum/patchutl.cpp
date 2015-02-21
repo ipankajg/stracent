@@ -42,7 +42,7 @@ void
 ihiRuleListDump(InclExclRuleList &inRuleList, LPCWSTR inTitle)
 {
     IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"**** DUMPING %s Rule List ****\n", inTitle);
-    for (int i = 0; i < inRuleList.size(); i++)
+    for (size_t i = 0; i < inRuleList.size(); i++)
     {
         ULONG tmpWeight = 0;
         InclExclRule &rule = inRuleList.at(i);
@@ -85,7 +85,7 @@ ihiRuleFind(InclExclRuleList &inRuleList, InclExclRuleMatchInfo &ioRuleMatchInfo
     matchFound = false;
     totalWeight = 0;
 
-    for (int i = 0; i < inRuleList.size(); i++)
+    for (size_t i = 0; i < inRuleList.size(); i++)
     {
         ULONG tmpWeight = 0;
         InclExclRule &rule = inRuleList.at(i);
@@ -435,4 +435,16 @@ ihiPatchAntiDebugFunction(LPCSTR inModuleName, LPCSTR inFnName)
     }
 
     return FALSE;
+}
+
+
+VOID
+ihiDebugLoop(BOOL inEnterLoop)
+{
+    _asm push eax;
+    _asm mov eax, inEnterLoop;
+debug:
+    _asm cmp eax, 1;
+    _asm je debug;
+    _asm pop eax;
 }

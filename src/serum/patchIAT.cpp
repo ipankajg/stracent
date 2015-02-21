@@ -43,7 +43,7 @@ Module Description:
 //
 // Variable only to aid debugging
 //
-bool gDebug = false;
+BOOL gDebug = FALSE;
 
 //
 // Used to manage all the patching related house keeping information.
@@ -224,7 +224,7 @@ ihiPatchedFuncEntry(
     DWORD   inECX,
     DWORD   inEDX)
 {
-    while(gDebug);
+    ihiDebugLoop(gDebug);
 
     InterlockedIncrement(&gThreadReferenceCount);
 
@@ -864,13 +864,6 @@ ihiPatchUnpatchModules(
     HINSTANCE   hDll,
     bool        inApplyHook)
 {
-    _asm push eax;
-    _asm mov eax, 1;
-debug:
-    _asm cmp eax, 0;
-    _asm je debug;
-    _asm pop eax;
-
     IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_LOUD, L"**** Patching/Unpatching modules ****\n");
 
     //

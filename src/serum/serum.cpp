@@ -66,13 +66,6 @@ LONG gThreadReferenceCount;
 //
 bool gEnableAntiDebugMeasures = false;
 
-typedef struct _ST_TRACE_OPTIONS {
-    bool EnableAntiDebugMeasures;
-    ULONG LoggingLevel;
-    ULONG IncludeListOffset;
-    ULONG ExcludeListOffset;
-} ST_TRACE_OPTIONS, *PST_TRACE_OPTIONS;
-
 /*++
 
 Routine Name:
@@ -103,12 +96,7 @@ IhSerumLoad(PVOID inContext, ULONG inContextSize)
 {
     PST_TRACE_OPTIONS trcOptions;
 
-    _asm push eax;
-    _asm mov eax, 1;
-debug:
-    _asm cmp eax, 0;
-    _asm je debug;
-    _asm pop eax;
+    ihiDebugLoop(gDebug);
     
     trcOptions = (PST_TRACE_OPTIONS)inContext;
     //
@@ -122,6 +110,8 @@ debug:
     {   
         ihiEnableAntiDebugMeasures();
     }
+
+    gDebug = trcOptions->EnableDebugging;
 
     char szModuleName[MAX_PATH] = {0};
 
