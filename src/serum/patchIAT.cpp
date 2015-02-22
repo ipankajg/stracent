@@ -45,6 +45,8 @@ Module Description:
 //
 BOOL gDebug = FALSE;
 
+DWORD gTlsIndex = TLS_OUT_OF_INDEXES;
+
 //
 // Used to manage all the patching related house keeping information.
 //
@@ -99,6 +101,133 @@ ihiInitPatchCode(
 #pragma warning(push)
 #pragma warning (disable : 4731)
 
+ULONG
+__stdcall
+ihiGetLastErrorValue()
+{
+    ULONG errorValue;
+
+    _asm
+    {
+        mov ecx, dword ptr fs : [0x18];
+        mov eax, dword ptr[ecx + 0x34];
+        mov errorValue, eax;
+    }
+
+    return errorValue;
+}
+
+
+VOID
+__stdcall
+ihiSetLastErrorValue(ULONG inErrorValue)
+{
+    _asm
+    {
+        mov ecx, dword ptr fs : [0x18];
+        mov eax, inErrorValue;
+        mov dword ptr[ecx + 0x34], eax;
+    }
+}
+
+BOOL
+__stdcall
+ihiPreventReEnter()
+{
+    BOOL preventReEnter;
+
+    _asm
+    {
+        mov edx, gTlsIndex;
+        cmp edx, 0xFFFFFFFF;
+        jne TlsValid;
+
+        mov eax, 1;
+        jmp End;
+        
+    TlsValid:
+        mov ecx, dword ptr fs : [0x18];
+        cmp edx, 0x40;
+        jge UseTlsExpansionSlots;
+        mov eax, dword ptr[ecx + edx * 4 + 0E10h]; 
+        jmp End;
+
+    UseTlsExpansionSlots:
+        mov ecx, dword ptr[ecx + 0F94h];
+        test ecx, ecx;
+        je End;
+        mov eax, dword ptr[ecx + edx * 4 - 100h];
+
+    End:
+        mov preventReEnter, eax;
+    }
+
+    return preventReEnter;
+}
+
+
+VOID
+__stdcall
+ihiEnableReEntrancy()
+{
+    _asm
+    {
+        mov edx, gTlsIndex;
+        cmp edx, 0xFFFFFFFF;
+        je End;
+
+        xor eax, eax;
+        mov ecx, dword ptr fs : [0x18];
+        cmp edx, 0x40;
+        jge UseTlsExpansionSlots;
+        mov dword ptr[ecx + edx * 4 + 0E10h], eax;
+        jmp End;
+
+    UseTlsExpansionSlots:
+        mov ecx, dword ptr[ecx + 0F94h];
+        test ecx, ecx;
+        je End;
+        mov dword ptr[ecx + edx * 4 - 100h], eax;
+
+    End:
+    }
+}
+
+
+VOID
+__stdcall
+ihiDisableReEntrancy()
+{
+    _asm
+    {
+        mov edx, gTlsIndex;
+        cmp edx, 0xFFFFFFFF;
+        je End;
+
+        mov eax, 1;
+        mov ecx, dword ptr fs : [0x18];
+        cmp edx, 0x40;
+        jge UseTlsExpansionSlots;
+        mov dword ptr[ecx + edx * 4 + 0E10h], eax;
+        jmp End;
+
+    UseTlsExpansionSlots:
+        mov ecx, dword ptr[ecx + 0F94h];
+        test ecx, ecx;
+        je End;
+        mov dword ptr[ecx + edx * 4 - 100h], eax;
+
+    End:
+    }
+}
+
+DWORD_PTR
+__stdcall
+ihiGetOrigFuncAddrAt(PULONG inId)
+{
+    return (DWORD_PTR)gPatchManager.GetOrigFuncAddrAt(*inId);
+}
+
 /*++
 
 Routine Name:
@@ -134,26 +263,60 @@ ihiPatchProlog()
     //
     __asm
     {
-        push    ebx
-        pushf
-        pushf
+        pop     eax;
+        push    ecx;
+        push    edx;
+        push    eax;
 
-        mov     ebx, esp
-        add     ebx, 8
-        push    edx
-        push    ecx
-        push    ebx
-        call    ihiPatchedFuncEntry
+        call    ihiPreventReEnter;
+        test    eax, eax;
+        je PatchingAllowed;
 
-        popf
-        popf
-        pop     ebx
+        //
+        // Handle Patching _NOT_ Allowed.
+        //
 
-        ; Pop off as many bytes of stack now
-        ; as popped off by original API
-        add     esp, edx
+        //
+        // The stack already has the API ID at the bottom, so we don't need
+        // to push anything on the stack and simply make the function call.
+        // The good thing is that this function is stdcall so when it returns,
+        // it would return the original API address in eax and remove API ID
+        // from the stack. Then once we pop off, edx and ecx, the stack would
+        // be exact as it was when original called invoked the patched API.
+        // At that point, we can simply jump to original API address, thereby
+        // completely getting out of the patching code.
+        //
+        call    ihiGetOrigFuncAddrAt;
+        pop     edx;
+        pop     ecx;
+        jmp     eax;
 
-        ret
+            
+    PatchingAllowed:
+        pop     eax;
+        pop     edx;
+        pop     ecx;
+        push    eax;
+        push    ebx;
+        pushf;
+        pushf;
+
+        mov     ebx, esp;
+        add     ebx, 8; 
+        push    edx;
+        push    ecx;
+        push    ebx;
+        call    ihiPatchedFuncEntry;
+
+        popf;
+        popf;
+        pop     ebx;
+
+        // Pop off as many bytes of stack now
+        // as popped off by original API
+        add     esp, edx;
+
+        ret;
     }
 }
 
@@ -225,6 +388,8 @@ ihiPatchedFuncEntry(
     DWORD   inEDX)
 {
     ihiDebugLoop(gDebug);
+
+    ihiDisableReEntrancy();
 
     InterlockedIncrement(&gThreadReferenceCount);
 
@@ -350,6 +515,8 @@ ihiPatchedFuncEntry(
     //
     SetLastError(errorCode);
 
+    ihiEnableReEntrancy();
+
     //
     // for C++ functions we need to restore ecx because it contains
     // this pointer.
@@ -376,6 +543,8 @@ ihiPatchedFuncEntry(
         mov     esp,        dwESP
         popad
     }
+
+    ihiDisableReEntrancy();
 
     //
     // Save the error code if any as set by the original function

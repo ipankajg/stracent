@@ -95,23 +95,38 @@ WINAPI
 IhSerumLoad(PVOID inContext, ULONG inContextSize)
 {
     PST_TRACE_OPTIONS trcOptions;
-
-    ihiDebugLoop(gDebug);
     
     trcOptions = (PST_TRACE_OPTIONS)inContext;
+
     //
     // TODO: Validate if IncludeListOffset and ExcludeListOffset fall
     // with-in inContext size or not.
     //
 
+    gDebug = trcOptions->EnableDebugging;
+    ihiDebugLoop(gDebug);
+
     IhuSetDbgLogLevel(trcOptions->LoggingLevel);
 
-    if (trcOptions->EnableAntiDebugMeasures)
-    {   
-        ihiEnableAntiDebugMeasures();
+    gTlsIndex = TlsAlloc();
+    if (gTlsIndex == TLS_OUT_OF_INDEXES)
+    {
+        IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_FATAL, 
+                       L"Failed to allocate a TLS Index, patching cannot continue.\n");
+        goto Exit;
     }
 
-    gDebug = trcOptions->EnableDebugging;
+    IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_INFO,
+        L"TLS Index successfully allocated. Value: %x.\n", gTlsIndex);
+
+    ihiDisableReEntrancy();
+
+    if (trcOptions->EnableAntiDebugMeasures)
+    {
+        IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_LOUD,
+            L"Enabling Anti-Debug Measures.\n");
+        ihiEnableAntiDebugMeasures();
+    }
 
     char szModuleName[MAX_PATH] = {0};
 
@@ -122,13 +137,8 @@ IhSerumLoad(PVOID inContext, ULONG inContextSize)
     }
     else
     {
-        char szStr[512] = {0};
-
-        sprintf(    szStr,
-                    "#Failed to obtain the main executable name. Error = %x\n",
-                    GetLastError());
-
-        OutputDebugStringA(szStr);
+        IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_ERROR,
+            L"Failed to obtain the main executable name. Error = %x\n", GetLastError());
     }
 
     //
@@ -143,6 +153,9 @@ IhSerumLoad(PVOID inContext, ULONG inContextSize)
     ihiPatchUnpatchModules(g_hInstance, true);
 
     g_processPatched = true;
+
+Exit:
+    return;
 }
 
 
@@ -167,7 +180,11 @@ void
 WINAPI
 IhSerumUnload()
 {
-    ihiPatchUnpatchModules(g_hInstance, false);
+    if (g_processPatched)
+    {
+        ihiPatchUnpatchModules(g_hInstance, false);
+        g_processPatched = false;
+    }
 }
 
 

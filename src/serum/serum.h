@@ -52,6 +52,7 @@ using namespace std;
 extern HINSTANCE g_hInstance;
 extern LONG gThreadReferenceCount;
 extern string g_MainExeName;
+extern DWORD gTlsIndex;
 
 //
 // Exported functions.
@@ -108,7 +109,6 @@ ULONG   inApiIndex);
 void
 ihiPatchProlog();
 
-
 void
 __stdcall
 ihiPatchedFuncEntry(
@@ -116,6 +116,29 @@ ihiPatchedFuncEntry(
     DWORD   inECX,
     DWORD   inEDX);
 
+DWORD_PTR
+__stdcall
+ihiGetOrigFuncAddrAt(PULONG inId);
+
+ULONG
+__stdcall
+ihiGetLastErrorValue();
+
+VOID
+__stdcall
+ihiSetLastErrorValue(ULONG inErrorValue);
+
+BOOL
+__stdcall
+ihiPreventReEnter();
+
+VOID
+__stdcall
+ihiDisableReEntrancy();
+
+VOID
+__stdcall
+ihiEnableReEntrancy();
 
 void
 ihiPatchUnpatchImports(

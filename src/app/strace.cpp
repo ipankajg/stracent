@@ -382,58 +382,58 @@ Arguments:
 
                             if (!processInfected)
                             {
-                                HRSRC       hRes;
-                                HGLOBAL     hResG;
-                                LPVOID      pRes;
-                                DWORD       dwResSize;
-
-                                hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_BIN_DLL), L"BIN");
-                                hResG       = LoadResource(NULL, hRes);
-                                pRes        = LockResource(hResG);
-                                dwResSize   = SizeofResource(NULL, hRes);
-
-                                wchar_t tempPath[MAX_PATH];
-                                wchar_t tempFile[MAX_PATH];
-                                GetTempPath(MAX_PATH, tempPath);
-                                GetTempFileName(tempPath, L"", 0, tempFile);
-
-                                gInjectorDllPath = tempFile;
-
-                                HANDLE oFile = CreateFile(
-                                                    gInjectorDllPath.c_str(),
-                                                    GENERIC_READ | GENERIC_WRITE,
-                                                    0,
-                                                    NULL,
-                                                    CREATE_ALWAYS,
-                                                    FILE_ATTRIBUTE_NORMAL,
-                                                    NULL);
-
-                                if (oFile == INVALID_HANDLE_VALUE)
+                                if (!gEnableDebugging)
                                 {
-                                    gView->PrintError(
+                                    HRSRC       hRes;
+                                    HGLOBAL     hResG;
+                                    LPVOID      pRes;
+                                    DWORD       dwResSize;
+
+                                    hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_BIN_DLL), L"BIN");
+                                    hResG = LoadResource(NULL, hRes);
+                                    pRes = LockResource(hResG);
+                                    dwResSize = SizeofResource(NULL, hRes);
+
+                                    wchar_t tempPath[MAX_PATH];
+                                    wchar_t tempFile[MAX_PATH];
+                                    GetTempPath(MAX_PATH, tempPath);
+                                    GetTempFileName(tempPath, L"", 0, tempFile);
+
+                                    gInjectorDllPath = tempFile;
+
+                                    HANDLE oFile = CreateFile(
+                                        gInjectorDllPath.c_str(),
+                                        GENERIC_READ | GENERIC_WRITE,
+                                        0,
+                                        NULL,
+                                        CREATE_ALWAYS,
+                                        FILE_ATTRIBUTE_NORMAL,
+                                        NULL);
+
+                                    if (oFile == INVALID_HANDLE_VALUE)
+                                    {
+                                        gView->PrintError(
                                             L"Failed to create the temporary DLL [%s]. Error code = %x\n",
                                             gInjectorDllPath.c_str(),
                                             GetLastError());
-                                    return;
-                                }
+                                        return;
+                                    }
 
-                                DWORD bytesWritten;
-                                if (!WriteFile(oFile, pRes, dwResSize, &bytesWritten, NULL))
-                                {
-                                    gView->PrintError(
+                                    DWORD bytesWritten;
+                                    if (!WriteFile(oFile, pRes, dwResSize, &bytesWritten, NULL))
+                                    {
+                                        gView->PrintError(
                                             L"Failed to write the temporary DLL. Error code = %x\n",
                                             GetLastError());
-                                    return;
+                                        return;
+                                    }
+                                    CloseHandle(oFile);
                                 }
-                                CloseHandle(oFile);
-#if 0
+                                else
                                 {
                                     wchar_t exePath[MAX_PATH];
 
-                                    if (GetModuleFileName(
-                                                        NULL,
-                                                        exePath,
-                                                        MAX_PATH))
+                                    if (GetModuleFileName(NULL, exePath, MAX_PATH))
                                     {
                                         std::wstring dllPath = exePath;
                                         int slashPos = dllPath.find_last_of(L'\\');
@@ -446,7 +446,7 @@ Arguments:
                                         gInjectorDllPath = dllPath;
                                     }
                                 }
-#endif
+
                                 //
                                 // Create the parameter block and pass it to IhuInjectDll
                                 //

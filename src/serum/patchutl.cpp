@@ -360,14 +360,12 @@ BOOL ihiGetExportedFunctionName(LPCWSTR inModuleName, WORD inOrdinal,
             if (_IhuDbgLogLevel <= IHU_LEVEL_FLOOD)
             {
                 LPSTR name = (LPSTR)ihiGetPtrFromRVA((DWORD)pNames[i], pINTH, (DWORD)lpFileBase);
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FLOOD, L"Ordinal: %x\n", ordinal);
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FLOOD, L"Name: %S\n", name);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FLOOD, L"PrintAll: Ordinal: %x, Name: %S\n", ordinal, name);
             }
             if (ordinal == inOrdinal)
             {
                 LPSTR name = (LPSTR)ihiGetPtrFromRVA((DWORD)pNames[i], pINTH, (DWORD)lpFileBase);
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Ordinal: %x\n", ordinal);
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Name: %S\n", name);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Found: Ordinal: %x, Name: %S\n", ordinal, name);
                 if (strlen(name) < inFnNameSize)
                 {
                     strcpy(outFnName, name);
