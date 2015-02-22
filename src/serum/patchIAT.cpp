@@ -741,6 +741,8 @@ ihiPatchedFuncEntry(
     //
     SetLastError(errorCode);
 
+    ihiEnableReEntrancy();
+
     // Set the registers for use in ihiPatchProlog
     __asm
     {
