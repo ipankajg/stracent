@@ -964,7 +964,7 @@ Exit:
 
     if (funcResult)
     {
-        if (oRetValInfo != NULL)
+        if (oRetValInfo != NULL && inclRule.MatchWeight > 0)
         {
             *oRetValInfo = inclRule.ReturnValue;
         }
