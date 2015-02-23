@@ -142,6 +142,7 @@ ihiPreventReEnter()
         cmp edx, 0xFFFFFFFF;
         jne TlsValid;
 
+    TlsInvalid:
         mov eax, 1;
         jmp End;
         
@@ -155,7 +156,7 @@ ihiPreventReEnter()
     UseTlsExpansionSlots:
         mov ecx, dword ptr[ecx + 0F94h];
         test ecx, ecx;
-        je End;
+        je TlsInvalid;
         mov eax, dword ptr[ecx + edx * 4 - 100h];
 
     End:
@@ -321,6 +322,21 @@ ihiPatchProlog()
 }
 
 
+VOID
+__fastcall
+ihiAtomicIncrement(PLONG Num)
+{
+    __asm lock inc dword ptr[ecx];
+}
+
+VOID
+__fastcall
+ihiAtomicDecrement(PLONG Num)
+{
+    __asm lock dec dword ptr[ecx];
+}
+
+
 /*++
 
 Routine Name:
@@ -389,9 +405,24 @@ ihiPatchedFuncEntry(
 {
     ihiDebugLoop(gDebug);
 
+    //
+    // Disable reentrancy to prevent circular loop due to us calling
+    // certain system APIs.
+    //
     ihiDisableReEntrancy();
 
-    InterlockedIncrement(&gThreadReferenceCount);
+    //
+    // Used to store the error code of original API
+    //
+    DWORD errorCode = 0;
+
+    //
+    // Save the error code so that if any of the call in our
+    // function fails, it doesn't affect the original API processing
+    //
+    errorCode = ihiGetLastErrorValue();
+
+    ihiAtomicIncrement(&gThreadReferenceCount);
 
     //
     // Initially this stack location contains dwId
@@ -428,17 +459,6 @@ ihiPatchedFuncEntry(
     IHI_FN_RETURN_VALUE returnValueInfo = {0};
 
     //
-    // Used to store the error code of original API
-    //
-    DWORD errorCode = 0;
-
-    //
-    // Save the error code so that if any of the call in our
-    // function fails, it doesn't affect the original API processing
-    //
-    errorCode = GetLastError();
-
-    //
     // Address of original API
     //
     PFNORIGINAL pOrgFunc    = (PFNORIGINAL)gPatchManager.GetOrigFuncAddrAt(dwId);
@@ -460,15 +480,9 @@ ihiPatchedFuncEntry(
     // Log API Parameters Information
     //
     funcName = gPatchManager.GetFuncNameAt(dwId);
-    sprintf(    szStr,
-                "$[T%d] %s(%x, %x, %x, %x, ...) ",
-                GetCurrentThreadId(),
-                funcName,
-                *pFirstParam,
-                *(pFirstParam+1),
-                *(pFirstParam+2),
-                *(pFirstParam+3));
-
+    xsprintf(szStr, "$[T%d] %s(%x, %x, %x, %x, ...) ", GetCurrentThreadId(),
+             funcName, *pFirstParam, *(pFirstParam+1), *(pFirstParam+2),
+             *(pFirstParam+3));
     OutputDebugStringA(szStr);
 
 
@@ -511,11 +525,15 @@ ihiPatchedFuncEntry(
     memcpy((PVOID)dwNewESP, (PVOID)pFirstParam, nMaxBytesToCopy);
 
     //
+    // Enable re-entrancy because we want to intercept functions called
+    // by the original API.
+    //
+    ihiEnableReEntrancy();
+
+    //
     // Set last error code before calling the original function
     //
-    SetLastError(errorCode);
-
-    ihiEnableReEntrancy();
+    ihiSetLastErrorValue(errorCode);
 
     //
     // for C++ functions we need to restore ecx because it contains
@@ -532,10 +550,9 @@ ihiPatchedFuncEntry(
     returnValue = (*pOrgFunc)();
 
     //
-    // At this point, esp is messed up because
-    // original function might have removed only
-    // partial number of parameters. We need to find
-    // our how many did it remove
+    // At this point, esp is messed up because original function might have
+    // removed only partial number of parameters. We need to find out how
+    // many did it remove.
     //
     __asm
     {
@@ -544,31 +561,29 @@ ihiPatchedFuncEntry(
         popad
     }
 
-    ihiDisableReEntrancy();
+    //
+    // Save the error code if any as set by the original function. We will
+    // restore is just before return from our hook function. This is done to
+    // make sure that any API calls we make in our hook function don't stomp
+    // over the error code set by the original API.
+    //
+    errorCode = ihiGetLastErrorValue();
 
     //
-    // Save the error code if any as set by the original function
-    // We will restore is just before return from our hook function
-    // This is done to make sure that any API calls we make in our
-    // hook function don't stomp over the error code set by the
-    // original API
-    //
-    errorCode = GetLastError();
+    // Disable re-entrancy again because we don't want to intercept functions
+    // called by the patched function, as it would cause non-terminated
+    // recursion.
+    ihiDisableReEntrancy();
 
     gPatchManager.GetFnReturnValueInfoAt(dwId, returnValueInfo);
 
     if (returnValueInfo.UserSpecified)
     {
-        sprintf(    szStr,
-                    "$= %x -> %x\n",
-                    returnValue,
-                    returnValueInfo.Value);
+        xsprintf(szStr, "$= %x -> %x\n", returnValue, returnValueInfo.Value);
     }
     else
     {
-        sprintf(    szStr,
-                    "$= %x\n",
-                    returnValue);
+        xsprintf(szStr, "$= %x\n", returnValue);
     }
 
     //
@@ -734,12 +749,12 @@ ihiPatchedFuncEntry(
     //
     dwESPDiff += 4;
 
-    InterlockedDecrement(&gThreadReferenceCount);
+    ihiAtomicDecrement(&gThreadReferenceCount);
 
     //
-    // Restore error code here
+    // Set lastError to same value as set by the original API.
     //
-    SetLastError(errorCode);
+    ihiSetLastErrorValue(errorCode);
 
     ihiEnableReEntrancy();
 

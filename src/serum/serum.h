@@ -44,7 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ihulib.h"
 #include "stcmn.h"
 
-#define TRC_PATCHIAT IHU_LOGGING_ON
+#define TRC_PATCHIAT IHU_LOGGING_OFF
 #define TRC_INJECTOR IHU_LOGGING_ON
 
 using namespace std;
@@ -139,6 +139,10 @@ ihiDisableReEntrancy();
 VOID
 __stdcall
 ihiEnableReEntrancy();
+
+extern "C"
+void
+xsprintf(char *buff, const char *fmt, ...);
 
 void
 ihiPatchUnpatchImports(

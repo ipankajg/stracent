@@ -306,7 +306,6 @@ Return:
     {
         if (pCurrent == NULL)
         {
-            //IHU_DBG_ASSERT(FALSE);
             break;
         }
 
@@ -724,7 +723,7 @@ CPatchInclExclMgr::SetInclExclList(
     // Hardcoded exclusion for problem causing modules.
     //
     std::string fixedExcludes;
-    fixedExcludes = "<msvc*:*:*><*:ntdll.dll:*><*:msvc*:*><*:mfc*:*><*:api-ms-win*:*>";
+    fixedExcludes = "<*:ntdll.dll:*><*:msvc*:*><*:mfc*:*><*:api-ms-win*:*>";
     IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
         L"Adding hardcoded excludes: %S\n",
         fixedExcludes.c_str());

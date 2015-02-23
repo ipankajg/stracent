@@ -15,6 +15,7 @@
     <ClCompile Include="..\src\serum\patchmgr.cpp" />
     <ClCompile Include="..\src\serum\patchutl.cpp" />
     <ClCompile Include="..\src\serum\serum.cpp" />
+    <ClCompile Include="..\src\serum\xprintf.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\serum\serum.h" />
