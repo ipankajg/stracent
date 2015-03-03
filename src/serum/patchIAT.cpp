@@ -461,7 +461,7 @@ ihiPatchedFuncEntry(
     //
     // Address of original API
     //
-    PFNORIGINAL pOrgFunc    = (PFNORIGINAL)gPatchManager.GetOrigFuncAddrAt(dwId);
+    PFNORIGINAL pOrgFunc = (PFNORIGINAL)gPatchManager.GetOrigFuncAddrAt(dwId);
 
     //
     // Used for logging
@@ -522,7 +522,14 @@ ihiPatchedFuncEntry(
         mov     dwNewESP,   esp
     }
 
-    memcpy((PVOID)dwNewESP, (PVOID)pFirstParam, nMaxBytesToCopy);
+    if ((dwNewESP & 0x3) == 0 && ((DWORD_PTR)pFirstParam & 0x3) == 0)
+    {
+        ihiFastMemCpy((PULONG)dwNewESP, (PULONG)pFirstParam, nMaxBytesToCopy);
+    }
+    else
+    {
+        ihiSlowMemCpy((PUCHAR)dwNewESP, (PUCHAR)pFirstParam, nMaxBytesToCopy);
+    }
 
     //
     // Enable re-entrancy because we want to intercept functions called
@@ -657,16 +664,7 @@ ihiPatchedFuncEntry(
         //
         ihiRemoveUnloadedModules();
     }
-    else if (returnValue != NULL && strcmp(funcName, "GetProcAddress") == 0 && 0)
-    //
-    // For now patching of functions found via GetProcAddress is disabled by
-    // adding && 0. This is done because if we patch the functions returned
-    // by GetProcAddress, some weird thing is happening and it is causing IE
-    // to fail to load any page. I don't have interest to fix this issue right
-    // now so i am disabling the feature for the time being
-    //
-    // TODO: Fix this problem sometime.
-    //
+    else if (returnValue != NULL && strcmp(funcName, "GetProcAddress") == 0)
     {
         char szModuleName[MAX_PATH] = {0};
 

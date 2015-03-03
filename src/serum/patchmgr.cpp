@@ -722,12 +722,15 @@ CPatchInclExclMgr::SetInclExclList(
     //
     // Hardcoded exclusion for problem causing modules.
     //
-    std::string fixedExcludes;
-    fixedExcludes = "<*:ntdll.dll:*><*:msvc*:*><*:mfc*:*><*:api-ms-win*:*>";
-    IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,
-        L"Adding hardcoded excludes: %S\n",
-        fixedExcludes.c_str());
-    BuildInclOrExclList(fixedExcludes, m_ExcludeRuleList);
+    string modName;
+    modName = "ntdll";
+    m_ExcludeModuleList.push_back(modName);
+    modName = "msvc";
+    m_ExcludeModuleList.push_back(modName);
+    modName = "mfc";
+    m_ExcludeModuleList.push_back(modName);
+    modName = "api-ms-win";
+    m_ExcludeModuleList.push_back(modName);
 
     //
     // User provided include/exclude.
@@ -944,6 +947,12 @@ Return:
     inclRule.FunctionName = inFnName;
     exclRule = inclRule;
 
+    if (ihiIsModuleExcluded(inclRule.ImportedModuleName, m_ExcludeModuleList, m_IncludeRuleList))
+    {
+        funcResult = false;
+        goto Exit;
+    }
+
     ihiRuleFind(m_IncludeRuleList, inclRule);
     ihiRuleFind(m_ExcludeRuleList, exclRule);
 
@@ -954,6 +963,11 @@ Return:
     if (exclRule.MatchWeight <= inclRule.MatchWeight)
     {
         funcResult = true;
+
+        if (oRetValInfo != NULL && inclRule.MatchWeight > 0)
+        {
+            *oRetValInfo = inclRule.ReturnValue;
+        }
     }
     else
     {
@@ -964,11 +978,6 @@ Exit:
 
     if (funcResult)
     {
-        if (oRetValInfo != NULL && inclRule.MatchWeight > 0)
-        {
-            *oRetValInfo = inclRule.ReturnValue;
-        }
-
         if (inFnName != NULL)
         {
             IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO,

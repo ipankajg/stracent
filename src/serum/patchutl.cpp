@@ -63,9 +63,19 @@ ULONG
 ihiCalcMatchWeight(string &inString1, bool inIsPrefix, string &inString2)
 {
     ULONG matchWeight = 0;
-    if (_strnicmp(inString1.c_str(), inString2.c_str(), strlen(inString1.c_str())) == 0)
+    if (inIsPrefix)
     {
-        matchWeight = strlen(inString1.c_str()) + (inIsPrefix ? 1 : 2);
+        if (_strnicmp(inString1.c_str(), inString2.c_str(), strlen(inString1.c_str())) == 0)
+        {
+            matchWeight = strlen(inString1.c_str()) + 1;
+        }
+    }
+    else
+    {
+        if (_stricmp(inString1.c_str(), inString2.c_str()) == 0)
+        {
+            matchWeight = strlen(inString1.c_str()) + 2;
+        }
     }
 
     return matchWeight;
@@ -108,6 +118,40 @@ ihiRuleFind(InclExclRuleList &inRuleList, InclExclRuleMatchInfo &ioRuleMatchInfo
     }
 
     return matchFound;
+}
+
+
+bool
+ihiIsModuleExcluded(string &inModuleName, vector<string> &inExcludedModuleList, InclExclRuleList &inIncludedRuleList)
+{
+    ULONG moduleExclusionWeight = 0;
+    ULONG moduleInclusionWeight = 0;
+
+    for (size_t i = 0; i < inIncludedRuleList.size(); i++)
+    {
+        ULONG tmpWeight = 0;
+        InclExclRule &rule = inIncludedRuleList.at(i);
+        tmpWeight = ihiCalcMatchWeight(rule.ImportedModuleName, rule.ImportedModuleNameIsPrefix, inModuleName);
+
+        if (tmpWeight > moduleInclusionWeight)
+        {
+            moduleInclusionWeight = tmpWeight;
+        }
+    }
+
+    for (size_t i = 0; i < inExcludedModuleList.size(); i++)
+    {
+        ULONG tmpWeight = 0;
+        string &moduleName = inExcludedModuleList.at(i);
+        tmpWeight = ihiCalcMatchWeight(moduleName, true, inModuleName);
+
+        if (tmpWeight > moduleExclusionWeight)
+        {
+            moduleExclusionWeight = tmpWeight;
+        }
+    }
+
+    return (moduleExclusionWeight > moduleInclusionWeight);
 }
 
 
@@ -182,6 +226,7 @@ ihiGetEnclosingSection(DWORD relVA, PIMAGE_NT_HEADERS inINTH)
     return 0;
 }
 
+
 LPVOID
 ihiGetPtrFromRVA(DWORD relVA, PIMAGE_NT_HEADERS inINTH, DWORD inBaseAddress)
 {
@@ -197,7 +242,6 @@ ihiGetPtrFromRVA(DWORD relVA, PIMAGE_NT_HEADERS inINTH, DWORD inBaseAddress)
     delta = (INT)(pISH->VirtualAddress - pISH->PointerToRawData);
     return (PVOID)(inBaseAddress + relVA - delta);
 }
-
 
 
 BOOL
@@ -288,6 +332,7 @@ Exit:
     *IIDPtr = pIID;
     return result;
 }
+
 
 BOOL ihiGetExportedFunctionName(LPCWSTR inModuleName, WORD inOrdinal,
     LPSTR outFnName, DWORD inFnNameSize)
@@ -407,18 +452,58 @@ ihiEnableAntiDebugMeasures()
         mov dword ptr[eax + 0x68], 0;
 
         //
-        // Clear ProcessHeap.ForceFlags
+        // TODO: The offsets here are not same for differnet versions of the OS.
+        //
+        // N.B. The correct offsets are shown below in form of the code, from:
+        //      https://github.com/nihilus/ScyllaHide/blob/master/Test/TestMain.cpp
+        //
+#if 0          
+                int FlagsOffset = 0x0C;
+                int ForceFlagsOffset = 0x10;
+
+        #ifdef _WIN64
+                if (dwMajorVersion >= 6)
+                {
+                    FlagsOffset = 0x70;
+                    ForceFlagsOffset = 0x74;
+                }
+                else
+                {
+                    FlagsOffset = 0x14;
+                    ForceFlagsOffset = 0x18;
+                }
+        #else
+
+                if (dwMajorVersion >= 6)
+                {
+                    FlagsOffset = 0x40;
+                    ForceFlagsOffset = 0x44;
+                }
+                else
+                {
+                    FlagsOffset = 0x0C;
+                    ForceFlagsOffset = 0x10;
+                }
+        #endif
+#endif
+
+        //
+        // Set ProcessHeap.Flags to 0x2
+        // and ProcessHeap.ForceFlags to 0x0
         //
         mov ebx, dword ptr[eax + 0x18];
-        lea eax, [ebx + 0xc];
+
+        lea eax, [ebx + 0x40];
         mov dword ptr[eax], 2;
-        lea eax, [ebx + 0x10];
+
+        lea eax, [ebx + 0x44];
         mov dword ptr[eax], 0;
 
         pop ebx;
         pop eax;
     }
 }
+
 
 BOOL
 ihiPatchAntiDebugFunction(LPCSTR inModuleName, LPCSTR inFnName)
@@ -447,3 +532,37 @@ debug:
     _asm pop eax;
 }
 
+
+VOID
+ihiFastMemCpy(PULONG inDest, PULONG inSrc, int inCount)
+{
+    ULONG fullUlongs;
+    ULONG trailingBytes;
+    PUCHAR inDestChar;
+    PUCHAR inSrcChar;
+
+    fullUlongs = inCount / sizeof(ULONG);
+    trailingBytes = inCount % sizeof(ULONG);
+
+    while (fullUlongs-- > 0)
+    {
+        *inDest++ = *inSrc++;
+    }
+
+    inDestChar = (PUCHAR)inDest;
+    inSrcChar = (PUCHAR)inSrc;
+    while (trailingBytes-- > 0)
+    {
+        *inDestChar++ = *inSrcChar;
+    }
+}
+
+
+VOID
+ihiSlowMemCpy(PUCHAR inDest, PUCHAR inSrc, int inCount)
+{
+    while (inCount-- > 0)
+    {
+        *inDest++ = *inSrc;
+    }
+}

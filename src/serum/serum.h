@@ -281,6 +281,9 @@ ihiRuleListDump(InclExclRuleList &inRuleList, LPCWSTR inTitle);
 bool
 ihiRuleFind(InclExclRuleList &inRuleList, InclExclRuleMatchInfo &ioRuleMatchInfo);
 
+bool
+ihiIsModuleExcluded(string &inModuleName, vector<string> &inExcludedModuleList, InclExclRuleList &inIncludedRuleList);
+
 //
 // Patch manager class
 //
@@ -420,6 +423,7 @@ public:
 private:
     InclExclRuleList    m_IncludeRuleList;
     InclExclRuleList    m_ExcludeRuleList;
+    vector<string>      m_ExcludeModuleList;
 };
 
 
@@ -491,5 +495,11 @@ ihiPatchAntiDebugFunction(LPCSTR inModuleName, LPCSTR inFnName);
 
 VOID
 ihiDebugLoop(BOOL inEnterLoop);
+
+VOID
+ihiFastMemCpy(PULONG inDest, PULONG inSrc, int inCount);
+
+VOID
+ihiSlowMemCpy(PUCHAR inDest, PUCHAR inSrc, int inCount);
 
 #endif
