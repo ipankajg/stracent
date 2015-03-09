@@ -196,8 +196,8 @@ ihiToUpper(char c);
 //
 typedef struct _IHI_FN_RETURN_VALUE
 {
-    bool    UserSpecified;
-    int     Value;
+    bool        UserSpecified;
+    ULONG_PTR   Value;
 
 } IHI_FN_RETURN_VALUE, *PIHI_FN_RETURN_VALUE;
 

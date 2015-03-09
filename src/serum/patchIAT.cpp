@@ -482,10 +482,27 @@ ihiPatchedFuncEntry(
     // Log API Parameters Information
     //
     funcName = gPatchManager.GetFuncNameAt(dwId);
+#if 0
     xsprintf(szStr, "$[T%d] %s(%x, %x, %x, %x, ...) ", GetCurrentThreadId(),
              funcName, *pFirstParam, *(pFirstParam+1), *(pFirstParam+2),
              *(pFirstParam+3));
     OutputDebugStringA(szStr);
+#else
+    ULONG trcIndex;
+    PST_TRACE_DATA trcData;
+    if (ihiRingBufferAllocate(gTraceRingBuffer, &trcIndex))
+    {
+        trcData = &gTraceBuffer[trcIndex];
+        trcData->TraceType = ST_TRACE_FUNCTION_CALL;
+        strncpy(trcData->FunctionName, funcName, sizeof(trcData->FunctionName) - 1);
+        trcData->FunctionArgs[0] = *pFirstParam;
+        trcData->FunctionArgs[1] = *(pFirstParam + 1);
+        trcData->FunctionArgs[2] = *(pFirstParam + 2);
+        trcData->FunctionArgs[3] = *(pFirstParam + 3);
+        trcData->Ecx = inECX;
+        trcData->Edx = inEDX;
+    }
+#endif
 
 
     //
@@ -588,17 +605,32 @@ ihiPatchedFuncEntry(
 
     if (returnValueInfo.UserSpecified)
     {
+#if 0
         xsprintf(szStr, "$= %x -> %x\n", returnValue, returnValueInfo.Value);
+#else
+        trcData->IsReturnValueModified = TRUE;
+        trcData->OrigReturnValue = (ULONG_PTR)returnValue;
+        trcData->NewReturnValue = returnValueInfo.Value;
+#endif
     }
     else
     {
+#if 0
         xsprintf(szStr, "$= %x\n", returnValue);
+#else
+        trcData->IsReturnValueModified = FALSE;
+        trcData->OrigReturnValue = (ULONG_PTR)returnValue;
+#endif
     }
 
     //
     // Log API Return value Information
     //
+#if 0
     OutputDebugStringA(szStr);
+#else
+    trcData->IsReady = TRUE;
+#endif
 
     if (_stricmp(funcName, "IsDebuggerPresent") == 0)
     {

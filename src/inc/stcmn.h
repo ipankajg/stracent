@@ -5,7 +5,8 @@ typedef struct _ST_TRACE_OPTIONS {
     bool EnableAntiDebugMeasures;
     bool EnableDebugging;
     ULONG LoggingLevel;
-    LUID Luid;
+    LUID TraceMemoryLuid;
+    ULONG TraceBufferCount;
     ULONG IncludeListOffset;
     ULONG ExcludeListOffset;
 } ST_TRACE_OPTIONS, *PST_TRACE_OPTIONS;
@@ -16,11 +17,15 @@ typedef enum _ST_TRACE_TYPE {
 } ST_TRACE_TYPE;
 
 typedef struct _ST_TRACE_DATA {
+    volatile BOOL IsReady;
     ST_TRACE_TYPE TraceType;
     CHAR FunctionName[64];
     ULONG_PTR FunctionArgs[4];
     ULONG_PTR Ecx;
     ULONG_PTR Edx;
+    ULONG_PTR OrigReturnValue;
+    BOOL IsReturnValueModified;
+    ULONG_PTR NewReturnValue;
 } ST_TRACE_DATA, *PST_TRACE_DATA;
 
 typedef struct _IHI_RING_BUFFER {
@@ -29,6 +34,11 @@ typedef struct _IHI_RING_BUFFER {
     volatile ULONG Tail;
     volatile BOOL BlockWriteOnFull;
 } IHI_RING_BUFFER, *PIHI_RING_BUFFER;
+
+typedef struct _IHI_SHARED_MEMORY {
+    HANDLE Handle;
+    PVOID Memory;
+} IHI_SHARED_MEMORY, *PIHI_SHARED_MEMORY;
 
 inline
 bool
@@ -59,6 +69,13 @@ ihiRingBufferUpdate(PIHI_RING_BUFFER ioRingBuffer, BOOL inBlockWriteOnFull)
 
 inline
 bool
+ihiRingBufferIsEmpty(PIHI_RING_BUFFER inRingBuffer)
+{
+    return (inRingBuffer->Head == inRingBuffer->Tail);
+}
+
+inline
+bool
 ihiRingBufferAllocate(PIHI_RING_BUFFER ioRingBuffer, PULONG outIndex)
 {
     bool status = false;
@@ -85,7 +102,6 @@ ihiRingBufferAllocate(PIHI_RING_BUFFER ioRingBuffer, PULONG outIndex)
 
     tryAlloc :
         lock cmpxchg [ebx]rb.Tail, ecx;
-        test eax, eax;
         jnz checkFull;
         mov eax, outIndex;
         mov [eax], ecx; 
@@ -111,12 +127,90 @@ ihiRingBufferFree(PIHI_RING_BUFFER ioRingBuffer)
     tryFree:
         mov eax, [ebx]rb.Head;
         mov ecx, eax;
-        inc ecx;    
-        lock cmpxchg[ebx]rb.Head, ecx;
-        test eax, eax;
+        inc ecx;
+        mov edx, [ebx]rb.Mask;
+        and ecx, edx;
+        lock cmpxchg [ebx]rb.Head, ecx;
         jnz tryFree;
     }
 }
+
+inline
+BOOL
+ihiCreateSharedMemory(LPCWSTR inName, ULONG inSize, PIHI_SHARED_MEMORY oSharedMemory)
+{
+    BOOL status;
+
+    status = FALSE;
+
+    oSharedMemory->Handle = CreateFileMapping(INVALID_HANDLE_VALUE, NULL,
+                                              PAGE_READWRITE, 0, inSize,
+                                              inName);
+    if (oSharedMemory->Handle == NULL)
+    {
+        goto Exit;
+    }
+
+    oSharedMemory->Memory = (PVOID)MapViewOfFile(oSharedMemory->Handle,
+                                                 FILE_MAP_ALL_ACCESS, 0, 0,
+                                                 inSize);
+    if (oSharedMemory->Memory == NULL)
+    {
+        CloseHandle(oSharedMemory->Handle);
+        goto Exit;
+    }
+
+    memset(oSharedMemory->Memory, 0, inSize);
+    status = TRUE;
+
+Exit:
+
+    return status;
+}
+
+inline
+BOOL
+ihiOpenSharedMemory(LPCWSTR inName, ULONG inSize, PIHI_SHARED_MEMORY oSharedMemory)
+{
+    BOOL status;
+
+    status = FALSE;
+
+    oSharedMemory->Handle = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE,
+                                            inName);
+    if (oSharedMemory->Handle == NULL)
+    {
+        goto Exit;
+    }
+
+    oSharedMemory->Memory = (PVOID)MapViewOfFile(oSharedMemory->Handle,
+                                                 FILE_MAP_ALL_ACCESS, 0, 0,
+                                                 inSize);
+    if (oSharedMemory->Memory == NULL)
+    {
+        CloseHandle(oSharedMemory->Handle);
+        goto Exit;
+    }
+
+    status = TRUE;
+
+Exit:
+
+    return status;
+}
+
+inline
+VOID
+ihiCloseSharedMemory(PIHI_SHARED_MEMORY inSharedMemory)
+{
+    UnmapViewOfFile(inSharedMemory->Memory);
+    CloseHandle(inSharedMemory->Handle);
+}
+
+
+extern IHI_SHARED_MEMORY gTraceMemory;
+extern PIHI_RING_BUFFER gTraceRingBuffer;
+extern PST_TRACE_DATA gTraceBuffer;
 
 #endif
 

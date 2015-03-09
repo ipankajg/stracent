@@ -103,6 +103,13 @@ bool gEnableAntiDebugMeasures = false;
 ULONG gLoggingLevel = IHU_LEVEL_ERROR;
 
 //
+// Global to store shared memory pointers for trace buffers.
+//
+IHI_SHARED_MEMORY gTraceMemory;
+PIHI_RING_BUFFER gTraceRingBuffer;
+PST_TRACE_DATA gTraceBuffer;
+
+//
 // Actions list based on the command line supplied
 // by the user
 //
@@ -297,6 +304,31 @@ funcEnd:
 }
 
 
+DWORD
+WINAPI
+CaptureThread(LPVOID inParam)
+{
+    do
+    {
+        while (ihiRingBufferIsEmpty(gTraceRingBuffer))
+        {
+            Sleep(120);
+            gView->PrintTrace(L"RingBuffer is Empty. Head: %x, Tail: %x\n", gTraceRingBuffer->Head, gTraceRingBuffer->Tail);
+        }
+        PST_TRACE_DATA trcData;
+        trcData = &gTraceBuffer[gTraceRingBuffer->Head + 1];
+        while (!trcData->IsReady)
+        {
+            Sleep(120);
+            gView->PrintTrace(L"TraceBuffer is NOT ready. IsReady: %x, Head: %x, Tail: %x\n", trcData->IsReady, gTraceRingBuffer->Head, gTraceRingBuffer->Tail);
+        }
+        gView->PrintTrace(L"%S\n", trcData->FunctionName);
+        trcData->IsReady = FALSE;
+        ihiRingBufferFree(gTraceRingBuffer);
+    } while (true);
+
+    return 0;
+}
 
 
 void
@@ -483,13 +515,30 @@ Arguments:
                                         GetLastError());
                                     return;
                                 }
+                                wchar_t shmName[64];
+                                wsprintf(shmName, L"%08x%08x", luid.HighPart, luid.LowPart);
+                                ULONG shmSize;
+                                shmSize = sizeof(IHI_RING_BUFFER) + sizeof(ST_TRACE_DATA) * 256;
+                                if (!ihiCreateSharedMemory(shmName, shmSize, &gTraceMemory))
+                                {
+                                    gView->PrintError(
+                                        L"Failed to create shared memory. Error code = %x\n",
+                                        GetLastError());
+                                    return;
+                                }
+                                gTraceRingBuffer = (PIHI_RING_BUFFER)gTraceMemory.Memory;
+                                gTraceBuffer = (PST_TRACE_DATA)((PUCHAR)gTraceRingBuffer + sizeof(IHI_RING_BUFFER));
+                                ihiRingBufferInit(gTraceRingBuffer, 256, TRUE);
 
-                                // ihiStartMemorySharing(&luid);
+                                DWORD threadId;
+                                CreateThread(NULL, 0, CaptureThread, NULL, 0,
+                                             &threadId);
 
                                 trcOptions->EnableAntiDebugMeasures = gEnableAntiDebugMeasures;
                                 trcOptions->EnableDebugging = gEnableDebugging;
                                 trcOptions->LoggingLevel = gLoggingLevel;
-                                trcOptions->Luid = luid;
+                                trcOptions->TraceMemoryLuid = luid;
+                                trcOptions->TraceBufferCount = 256;
                                 trcOptions->IncludeListOffset = sizeof(ST_TRACE_OPTIONS);
                                 trcOptions->ExcludeListOffset = trcOptions->IncludeListOffset + incListSize;
                                 strcpy((PCHAR)trcOptions + trcOptions->IncludeListOffset, fnIncludes.c_str());
@@ -655,6 +704,10 @@ Routine Description:
     ULONG index;
     ihiRingBufferInit(&rb, 64, TRUE);
     ihiRingBufferAllocate(&rb, &index);
+    ihiRingBufferFree(&rb);
+    ihiRingBufferAllocate(&rb, &index);
+    ihiRingBufferAllocate(&rb, &index);
+    ihiRingBufferFree(&rb);
     ihiRingBufferFree(&rb);
 #endif
     //

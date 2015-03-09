@@ -66,6 +66,13 @@ LONG gThreadReferenceCount;
 //
 bool gEnableAntiDebugMeasures = false;
 
+//
+// Global to store shared memory pointers for trace buffers.
+//
+IHI_SHARED_MEMORY gTraceMemory;
+PIHI_RING_BUFFER gTraceRingBuffer;
+PST_TRACE_DATA gTraceBuffer;
+
 /*++
 
 Routine Name:
@@ -114,6 +121,25 @@ IhSerumLoad(PVOID inContext, ULONG inContextSize)
     //
     osVersion = GetVersion();
     gMajorOSVersion = (DWORD)(LOBYTE(LOWORD(osVersion)));
+
+    //
+    // Setup shared memory for trace data.
+    //
+    wchar_t shmName[64];
+    wsprintf(shmName, L"%08x%08x",
+             trcOptions->TraceMemoryLuid.HighPart,
+             trcOptions->TraceMemoryLuid.LowPart);
+    ULONG shmSize;
+    shmSize = sizeof(IHI_RING_BUFFER) + sizeof(ST_TRACE_DATA) * 256;
+    if (!ihiOpenSharedMemory(shmName, shmSize, &gTraceMemory))
+    {
+        IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_FATAL, 
+                       L"Failed to open shared memory, patching cannot continue.\n"
+                       L"Please try again with command-line option -t.\n");
+        return;
+    }
+    gTraceRingBuffer = (PIHI_RING_BUFFER)gTraceMemory.Memory;
+    gTraceBuffer = (PST_TRACE_DATA)((PUCHAR)gTraceRingBuffer + sizeof(IHI_RING_BUFFER));
 
     gTlsIndex = TlsAlloc();
     if (gTlsIndex == TLS_OUT_OF_INDEXES)
