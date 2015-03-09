@@ -52,6 +52,7 @@ using namespace std;
 extern HINSTANCE g_hInstance;
 extern LONG gThreadReferenceCount;
 extern string g_MainExeName;
+extern DWORD gMajorOSVersion;
 extern DWORD gTlsIndex;
 
 //

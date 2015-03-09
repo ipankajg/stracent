@@ -435,6 +435,40 @@ VOID
 ihiEnableAntiDebugMeasures()
 {
     gEnableAntiDebugMeasures = true;
+
+    //
+    // Calculate the correct offset for ProcessHeap fields.
+    //
+    // N.B. The correct offsets are shown below in form of the code, from:
+    //      https://github.com/nihilus/ScyllaHide/blob/master/Test/TestMain.cpp
+    //
+    DWORD flagsOffset;
+    DWORD forceFlagsOffset;
+
+#ifdef _WIN64
+    if (gMajorOSVersion >= 6)
+    {
+        flagsOffset = 0x70;
+        forceFlagsOffset = 0x74;
+    }
+    else
+    {
+        flagsOffset = 0x14;
+        forceFlagsOffset = 0x18;
+    }
+#else
+    if (gMajorOSVersion >= 6)
+    {
+        flagsOffset = 0x40;
+        forceFlagsOffset = 0x44;
+    }
+    else
+    {
+        flagsOffset = 0x0C;
+        forceFlagsOffset = 0x10;
+    }
+#endif
+
     __asm
     {
         push eax;
@@ -452,51 +486,15 @@ ihiEnableAntiDebugMeasures()
         mov dword ptr[eax + 0x68], 0;
 
         //
-        // TODO: The offsets here are not same for differnet versions of the OS.
-        //
-        // N.B. The correct offsets are shown below in form of the code, from:
-        //      https://github.com/nihilus/ScyllaHide/blob/master/Test/TestMain.cpp
-        //
-#if 0          
-                int FlagsOffset = 0x0C;
-                int ForceFlagsOffset = 0x10;
-
-        #ifdef _WIN64
-                if (dwMajorVersion >= 6)
-                {
-                    FlagsOffset = 0x70;
-                    ForceFlagsOffset = 0x74;
-                }
-                else
-                {
-                    FlagsOffset = 0x14;
-                    ForceFlagsOffset = 0x18;
-                }
-        #else
-
-                if (dwMajorVersion >= 6)
-                {
-                    FlagsOffset = 0x40;
-                    ForceFlagsOffset = 0x44;
-                }
-                else
-                {
-                    FlagsOffset = 0x0C;
-                    ForceFlagsOffset = 0x10;
-                }
-        #endif
-#endif
-
-        //
         // Set ProcessHeap.Flags to 0x2
         // and ProcessHeap.ForceFlags to 0x0
         //
         mov ebx, dword ptr[eax + 0x18];
 
-        lea eax, [ebx + 0x40];
+        lea eax, [ebx + flagsOffset];
         mov dword ptr[eax], 2;
 
-        lea eax, [ebx + 0x44];
+        lea eax, [ebx + forceFlagsOffset];
         mov dword ptr[eax], 0;
 
         pop ebx;
@@ -566,3 +564,4 @@ ihiSlowMemCpy(PUCHAR inDest, PUCHAR inSrc, int inCount)
         *inDest++ = *inSrc;
     }
 }
+

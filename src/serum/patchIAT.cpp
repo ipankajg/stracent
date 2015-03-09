@@ -45,6 +45,8 @@ Module Description:
 //
 BOOL gDebug = FALSE;
 
+DWORD gMajorOSVersion;
+
 DWORD gTlsIndex = TLS_OUT_OF_INDEXES;
 
 //

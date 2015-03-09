@@ -472,9 +472,24 @@ Arguments:
                                 }
                                 memset(trcOptions, 0, trcOptionsSize); 
 
+                                //
+                                // Create shared memory block for information sharing.
+                                //
+                                LUID luid;
+                                if (!AllocateLocallyUniqueId(&luid))
+                                {
+                                    gView->PrintError(
+                                        L"Failed to allocate unique id for shared memory. Error code = %x\n",
+                                        GetLastError());
+                                    return;
+                                }
+
+                                // ihiStartMemorySharing(&luid);
+
                                 trcOptions->EnableAntiDebugMeasures = gEnableAntiDebugMeasures;
                                 trcOptions->EnableDebugging = gEnableDebugging;
                                 trcOptions->LoggingLevel = gLoggingLevel;
+                                trcOptions->Luid = luid;
                                 trcOptions->IncludeListOffset = sizeof(ST_TRACE_OPTIONS);
                                 trcOptions->ExcludeListOffset = trcOptions->IncludeListOffset + incListSize;
                                 strcpy((PCHAR)trcOptions + trcOptions->IncludeListOffset, fnIncludes.c_str());
@@ -635,6 +650,13 @@ Routine Description:
 
 --*/
 {
+#if 1
+    IHI_RING_BUFFER rb;
+    ULONG index;
+    ihiRingBufferInit(&rb, 64, TRUE);
+    ihiRingBufferAllocate(&rb, &index);
+    ihiRingBufferFree(&rb);
+#endif
     //
     // First thing is to initialize all global variables
     //

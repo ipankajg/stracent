@@ -55,12 +55,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\..\ihulib\bld\bin\$(Platform)\$(Configuration)</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\extrn\ihulib\bin\$(Platform)\$(Configuration)</LibraryPath>
     <OutDir>$(SolutionDir)..\bld\bin\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\..\ihulib\bld\bin\$(Platform)\$(Configuration)</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);..\extrn\ihulib\bin\$(Platform)\$(Configuration)</LibraryPath>
     <OutDir>$(SolutionDir)..\bld\bin\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)..\bld\tmp\$(ProjectName)\$(Configuration)\</IntDir>
   </PropertyGroup>
@@ -70,6 +70,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(SolutionDir)..\src\inc;$(SolutionDir)..\extrn\ihulib\bin;</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_WINDLL;%(PreprocessorDefinitions)_CRT_SECURE_NO_WARNINGS;_CRT_NON_CONFORMING_SWPRINTFS;</PreprocessorDefinitions>
+      <AssemblerOutput>NoListing</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -93,6 +94,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>$(SolutionDir)..\src\inc;$(SolutionDir)..\extrn\ihulib\bin;</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_WINDLL;%(PreprocessorDefinitions)_CRT_SECURE_NO_WARNINGS;_CRT_NON_CONFORMING_SWPRINTFS;</PreprocessorDefinitions>
+      <AssemblerOutput>NoListing</AssemblerOutput>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
