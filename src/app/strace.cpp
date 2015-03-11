@@ -312,17 +312,28 @@ CaptureThread(LPVOID inParam)
     {
         while (ihiRingBufferIsEmpty(gTraceRingBuffer))
         {
-            Sleep(120);
-            gView->PrintTrace(L"RingBuffer is Empty. Head: %x, Tail: %x\n", gTraceRingBuffer->Head, gTraceRingBuffer->Tail);
+            gView->PrintTrace(L"-");
+            Sleep(1);
         }
         PST_TRACE_DATA trcData;
-        trcData = &gTraceBuffer[gTraceRingBuffer->Head + 1];
+        trcData = &gTraceBuffer[gTraceRingBuffer->Head];
         while (!trcData->IsReady)
         {
-            Sleep(120);
-            gView->PrintTrace(L"TraceBuffer is NOT ready. IsReady: %x, Head: %x, Tail: %x\n", trcData->IsReady, gTraceRingBuffer->Head, gTraceRingBuffer->Tail);
+            gView->PrintTrace(L".");
         }
-        gView->PrintTrace(L"%S\n", trcData->FunctionName);
+        gView->PrintTrace(L"%S(%x, %x, %x, %x) = %x",
+                          trcData->FunctionName, trcData->FunctionArgs[0],
+                          trcData->FunctionArgs[1], trcData->FunctionArgs[2],
+                          trcData->FunctionArgs[3], trcData->OrigReturnValue);
+
+        if (trcData->IsReturnValueModified)
+        {
+            gView->PrintTrace(L" -> %x\n", trcData->NewReturnValue);
+        }
+        else
+        {
+            gView->PrintTrace(L"\n");
+        }
         trcData->IsReady = FALSE;
         ihiRingBufferFree(gTraceRingBuffer);
     } while (true);

@@ -103,8 +103,8 @@ ihiRingBufferAllocate(PIHI_RING_BUFFER ioRingBuffer, PULONG outIndex)
     tryAlloc :
         lock cmpxchg [ebx]rb.Tail, ecx;
         jnz checkFull;
-        mov eax, outIndex;
-        mov [eax], ecx; 
+        mov ecx, outIndex;
+        mov [ecx], eax;
         mov eax, 1;
 
     done:

@@ -468,7 +468,7 @@ ihiPatchedFuncEntry(
     //
     // Used for logging
     //
-    char szStr[1024];
+    // char szStr[1024];
     LPCSTR funcName         = NULL;
 
     //
@@ -487,23 +487,7 @@ ihiPatchedFuncEntry(
              funcName, *pFirstParam, *(pFirstParam+1), *(pFirstParam+2),
              *(pFirstParam+3));
     OutputDebugStringA(szStr);
-#else
-    ULONG trcIndex;
-    PST_TRACE_DATA trcData;
-    if (ihiRingBufferAllocate(gTraceRingBuffer, &trcIndex))
-    {
-        trcData = &gTraceBuffer[trcIndex];
-        trcData->TraceType = ST_TRACE_FUNCTION_CALL;
-        strncpy(trcData->FunctionName, funcName, sizeof(trcData->FunctionName) - 1);
-        trcData->FunctionArgs[0] = *pFirstParam;
-        trcData->FunctionArgs[1] = *(pFirstParam + 1);
-        trcData->FunctionArgs[2] = *(pFirstParam + 2);
-        trcData->FunctionArgs[3] = *(pFirstParam + 3);
-        trcData->Ecx = inECX;
-        trcData->Edx = inEDX;
-    }
 #endif
-
 
     //
     // Fat Note:
@@ -602,35 +586,41 @@ ihiPatchedFuncEntry(
     ihiDisableReEntrancy();
 
     gPatchManager.GetFnReturnValueInfoAt(dwId, returnValueInfo);
-
-    if (returnValueInfo.UserSpecified)
-    {
-#if 0
-        xsprintf(szStr, "$= %x -> %x\n", returnValue, returnValueInfo.Value);
-#else
-        trcData->IsReturnValueModified = TRUE;
-        trcData->OrigReturnValue = (ULONG_PTR)returnValue;
-        trcData->NewReturnValue = returnValueInfo.Value;
-#endif
-    }
-    else
-    {
-#if 0
-        xsprintf(szStr, "$= %x\n", returnValue);
-#else
-        trcData->IsReturnValueModified = FALSE;
-        trcData->OrigReturnValue = (ULONG_PTR)returnValue;
-#endif
-    }
+    
 
     //
     // Log API Return value Information
     //
 #if 0
+    if (returnValueInfo.UserSpecified)
+    {
+        xsprintf(szStr, "$= %x -> %x\n", returnValue, returnValueInfo.Value);
+    }
+    else
+    {
+        xsprintf(szStr, "$= %x\n", returnValue);
+    }
     OutputDebugStringA(szStr);
-#else
-    trcData->IsReady = TRUE;
 #endif
+
+    ULONG trcIndex;
+    PST_TRACE_DATA trcData;
+    if (ihiRingBufferAllocate(gTraceRingBuffer, &trcIndex))
+    {
+        trcData = &gTraceBuffer[trcIndex];
+        trcData->TraceType = ST_TRACE_FUNCTION_CALL;
+        strncpy(trcData->FunctionName, funcName, sizeof(trcData->FunctionName) - 1);
+        trcData->FunctionArgs[0] = *pFirstParam;
+        trcData->FunctionArgs[1] = *(pFirstParam + 1);
+        trcData->FunctionArgs[2] = *(pFirstParam + 2);
+        trcData->FunctionArgs[3] = *(pFirstParam + 3);
+        trcData->Ecx = inECX;
+        trcData->Edx = inEDX;
+        trcData->IsReturnValueModified = returnValueInfo.UserSpecified;
+        trcData->OrigReturnValue = (ULONG_PTR)returnValue;
+        trcData->NewReturnValue = returnValueInfo.Value;
+        trcData->IsReady = TRUE;
+    }
 
     if (_stricmp(funcName, "IsDebuggerPresent") == 0)
     {
