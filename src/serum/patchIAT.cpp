@@ -610,7 +610,7 @@ ihiPatchedFuncEntry(
                      *(pFirstParam + 1), *(pFirstParam + 2),
                      *(pFirstParam + 3), returnValue);
         }
-        // OutputDebugStringA(szStr);
+        OutputDebugStringA(szStr);
     }
 
     if (_stricmp(funcName, "IsDebuggerPresent") == 0)
