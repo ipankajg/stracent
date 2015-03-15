@@ -487,6 +487,7 @@ BOOL ihiGetExportedFunctionName(LPCWSTR inModuleName, WORD inOrdinal,
 
 extern bool gEnableAntiDebugMeasures;
 extern BOOL gDebug;
+extern bool gUseSharedMemory;
 
 VOID
 ihiEnableAntiDebugMeasures();

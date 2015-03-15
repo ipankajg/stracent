@@ -466,28 +466,11 @@ ihiPatchedFuncEntry(
     PFNORIGINAL pOrgFunc = (PFNORIGINAL)gPatchManager.GetOrigFuncAddrAt(dwId);
 
     //
-    // Used for logging
-    //
-    // char szStr[1024];
-    LPCSTR funcName         = NULL;
-
-    //
     // used to manage stack
     //
     DWORD dwESP;
     DWORD dwNewESP;
     DWORD dwESPDiff;
-
-    //
-    // Log API Parameters Information
-    //
-    funcName = gPatchManager.GetFuncNameAt(dwId);
-#if 0
-    xsprintf(szStr, "$[T%d] %s(%x, %x, %x, %x, ...) ", GetCurrentThreadId(),
-             funcName, *pFirstParam, *(pFirstParam+1), *(pFirstParam+2),
-             *(pFirstParam+3));
-    OutputDebugStringA(szStr);
-#endif
 
     //
     // Fat Note:
@@ -585,27 +568,16 @@ ihiPatchedFuncEntry(
     // recursion.
     ihiDisableReEntrancy();
 
+    //
+    // Log API Parameters Information and Return Value.
+    //
+    LPCSTR funcName = NULL;
+    funcName = gPatchManager.GetFuncNameAt(dwId);
     gPatchManager.GetFnReturnValueInfoAt(dwId, returnValueInfo);
-    
-
-    //
-    // Log API Return value Information
-    //
-#if 0
-    if (returnValueInfo.UserSpecified)
-    {
-        xsprintf(szStr, "$= %x -> %x\n", returnValue, returnValueInfo.Value);
-    }
-    else
-    {
-        xsprintf(szStr, "$= %x\n", returnValue);
-    }
-    OutputDebugStringA(szStr);
-#endif
 
     ULONG trcIndex;
     PST_TRACE_DATA trcData;
-    if (ihiRingBufferAllocate(gTraceRingBuffer, &trcIndex))
+    if (gUseSharedMemory && ihiRingBufferAllocate(gTraceRingBuffer, &trcIndex))
     {
         trcData = &gTraceBuffer[trcIndex];
         trcData->TraceType = ST_TRACE_FUNCTION_CALL;
@@ -620,6 +592,25 @@ ihiPatchedFuncEntry(
         trcData->OrigReturnValue = (ULONG_PTR)returnValue;
         trcData->NewReturnValue = returnValueInfo.Value;
         trcData->IsReady = TRUE;
+    }
+    else
+    {
+        char szStr[1024];
+        if (returnValueInfo.UserSpecified)
+        {
+            xsprintf(szStr, "$[T%d] %s(%x, %x, %x, %x, ...) = %x -> %x\n",
+                     GetCurrentThreadId(), funcName, *pFirstParam,
+                     *(pFirstParam + 1), *(pFirstParam + 2),
+                     *(pFirstParam + 3), returnValue, returnValueInfo.Value);
+        }
+        else
+        {
+            xsprintf(szStr, "$[T%d] %s(%x, %x, %x, %x, ...) = %x\n",
+                     GetCurrentThreadId(), funcName, *pFirstParam,
+                     *(pFirstParam + 1), *(pFirstParam + 2),
+                     *(pFirstParam + 3), returnValue);
+        }
+        // OutputDebugStringA(szStr);
     }
 
     if (_stricmp(funcName, "IsDebuggerPresent") == 0)
@@ -731,7 +722,7 @@ ihiPatchedFuncEntry(
             }
             else
             {
-                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_FATAL, L"Patch NOT required for: %S\n", fnName);
+                IHU_DBG_LOG_EX(TRC_PATCHIAT, IHU_LEVEL_INFO, L"Patch NOT required for: %S\n", fnName);
             }
         }
         else

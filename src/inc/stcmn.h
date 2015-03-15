@@ -5,6 +5,7 @@ typedef struct _ST_TRACE_OPTIONS {
     bool EnableAntiDebugMeasures;
     bool EnableDebugging;
     ULONG LoggingLevel;
+    bool UseSharedMemory;
     LUID TraceMemoryLuid;
     ULONG TraceBufferCount;
     ULONG IncludeListOffset;

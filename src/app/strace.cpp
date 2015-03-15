@@ -98,9 +98,20 @@ CStView *gView;
 bool gEnableAntiDebugMeasures = false;
 
 //
+// Command line option to store whether to only use debug output or not.
+//
+bool gOnlyUseDebugOutput = false;
+
+//
 // Logging level.
 //
 ULONG gLoggingLevel = IHU_LEVEL_ERROR;
+
+//
+// Variable to indicate if we can use shared memory.
+//
+bool gUseSharedMemory = false;
+
 
 //
 // Global to store shared memory pointers for trace buffers.
@@ -177,13 +188,14 @@ Routine Description:
 
 --*/
 {
-    gView->PrintMessage(L"StraceNT [-f <FilterFile>] [-e] [-l <LogLevel>] [[-p <PID>] | [-n <ProcName>] | [<Cmd [...]>]]\n");
+    gView->PrintMessage(L"StraceNT [-f <FilterFile>] [-e] [-d] [-l <LogLevel>] [[-n <ProcName>] | [-p <PID>] | [<Cmd [...]>]]\n");
     gView->PrintMessage(L"\nOptions:\n\n");
-    gView->PrintMessage(L"-f <FilterFile>   Filter data file (see stFilter.txt for details)\n");
+    gView->PrintMessage(L"-d                Use only debug output for traces\n");
     gView->PrintMessage(L"-e                Enable Anti-Debug Measures\n");
+    gView->PrintMessage(L"-f <FilterFile>   Filter data file (see stFilter.txt for details)\n");
     gView->PrintMessage(L"-l <LogLevel>     Log Level (0 - None, 1 - Errors <default>, 2 - Info, 3 - All)\n");
-    gView->PrintMessage(L"-p <PID>          Process Id of the process to trace\n");
     gView->PrintMessage(L"-n <ProcName>     New process name to launch and trace\n");
+    gView->PrintMessage(L"-p <PID>          Process Id of the process to trace\n");
     gView->PrintMessage(L"<Cmd [...]>       Command to execute and trace (e.g. \"notepad sampleFile.txt\")\n");
     gView->PrintMessage(L"\n");
 }
@@ -312,14 +324,14 @@ CaptureThread(LPVOID inParam)
     {
         while (ihiRingBufferIsEmpty(gTraceRingBuffer))
         {
-            gView->PrintTrace(L"-");
+            // gView->PrintTrace(L"-");
             Sleep(1);
         }
         PST_TRACE_DATA trcData;
         trcData = &gTraceBuffer[gTraceRingBuffer->Head];
         while (!trcData->IsReady)
         {
-            gView->PrintTrace(L".");
+            // gView->PrintTrace(L".");
         }
         gView->PrintTrace(L"%S(%x, %x, %x, %x) = %x",
                           trcData->FunctionName, trcData->FunctionArgs[0],
@@ -526,30 +538,37 @@ Arguments:
                                         GetLastError());
                                     return;
                                 }
-                                wchar_t shmName[64];
-                                wsprintf(shmName, L"%08x%08x", luid.HighPart, luid.LowPart);
-                                ULONG shmSize;
-                                shmSize = sizeof(IHI_RING_BUFFER) + sizeof(ST_TRACE_DATA) * 256;
-                                if (!ihiCreateSharedMemory(shmName, shmSize, &gTraceMemory))
-                                {
-                                    gView->PrintError(
-                                        L"Failed to create shared memory. Error code = %x\n",
-                                        GetLastError());
-                                    return;
-                                }
-                                gTraceRingBuffer = (PIHI_RING_BUFFER)gTraceMemory.Memory;
-                                gTraceBuffer = (PST_TRACE_DATA)((PUCHAR)gTraceRingBuffer + sizeof(IHI_RING_BUFFER));
-                                ihiRingBufferInit(gTraceRingBuffer, 256, TRUE);
 
-                                DWORD threadId;
-                                CreateThread(NULL, 0, CaptureThread, NULL, 0,
-                                             &threadId);
+                                if (!gOnlyUseDebugOutput)
+                                {
+                                    wchar_t shmName[64];
+                                    wsprintf(shmName, L"%08x%08x", luid.HighPart, luid.LowPart);
+                                    ULONG shmSize;
+                                    shmSize = sizeof(IHI_RING_BUFFER) + sizeof(ST_TRACE_DATA) * 65536;
+                                    if (ihiCreateSharedMemory(shmName, shmSize, &gTraceMemory))
+                                    {
+                                        gUseSharedMemory = true;
+                                        gTraceRingBuffer = (PIHI_RING_BUFFER)gTraceMemory.Memory;
+                                        gTraceBuffer = (PST_TRACE_DATA)((PUCHAR)gTraceRingBuffer + sizeof(IHI_RING_BUFFER));
+                                        ihiRingBufferInit(gTraceRingBuffer, 65536, FALSE);
+                                        DWORD threadId;
+                                        CreateThread(NULL, 0, CaptureThread, NULL, 0, &threadId);
+                                    }
+                                    else
+                                    {
+                                        gView->PrintError(
+                                            L"Failed to create shared memory. Error code = %x\n"
+                                            L"Falling back to using OutputDebugString.\n",
+                                            GetLastError());
+                                    }
+                                }
 
                                 trcOptions->EnableAntiDebugMeasures = gEnableAntiDebugMeasures;
                                 trcOptions->EnableDebugging = gEnableDebugging;
                                 trcOptions->LoggingLevel = gLoggingLevel;
+                                trcOptions->UseSharedMemory = gUseSharedMemory;
                                 trcOptions->TraceMemoryLuid = luid;
-                                trcOptions->TraceBufferCount = 256;
+                                trcOptions->TraceBufferCount = 65536;
                                 trcOptions->IncludeListOffset = sizeof(ST_TRACE_OPTIONS);
                                 trcOptions->ExcludeListOffset = trcOptions->IncludeListOffset + incListSize;
                                 strcpy((PCHAR)trcOptions + trcOptions->IncludeListOffset, fnIncludes.c_str());
@@ -773,6 +792,11 @@ Routine Description:
                  _wcsicmp(argV[indexArgs], L"/e") == 0)
         {
             gEnableAntiDebugMeasures = true;
+        }
+        else if (_wcsicmp(argV[indexArgs], L"-e") == 0 ||
+                 _wcsicmp(argV[indexArgs], L"/e") == 0)
+        {
+            gOnlyUseDebugOutput = true;
         }
         else if (_wcsicmp(argV[indexArgs], L"-l") == 0 ||
                  _wcsicmp(argV[indexArgs], L"/l") == 0)
