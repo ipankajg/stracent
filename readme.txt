@@ -8,7 +8,7 @@ Compile
 -------
 - Use Visual Studio 2013 to compile the software.
 - First download IHULIB library from:
-  https://github.com/IntellectualHeaven/ihulib/releases/download/v1.0/ihulib_v_1_0.zip
+  https://github.com/intellectualheaven/ihulib/releases/download/v1.1/ihulib_v_1_1.zip
 - Extract this to stracent/extrn/ihulib (preserve folder paths)
 - You should have files like ihulib/bin/x64/Debug/ihulib.lib etc.
 - Open stracent.sln in make folder and build.
