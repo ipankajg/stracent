@@ -86,7 +86,6 @@ bool gEnableDebugging = false;
 //
 std::wstring gInjectorDllPath;
 
-
 //
 // Global variable for view class
 //
@@ -112,6 +111,11 @@ ULONG gLoggingLevel = IHU_LEVEL_ERROR;
 //
 bool gUseSharedMemory = false;
 
+//
+// Variables to manage trace capture thread.
+//
+HANDLE gCaptureThreadHandle;
+bool gTerminateCaptureThread = false;
 
 //
 // Global to store shared memory pointers for trace buffers.
@@ -139,7 +143,6 @@ typedef enum _COMMAND_LINE_ACTION
 typedef BOOL (WINAPI *PFNDEBUGSETPROCESSKILLONEXIT)(BOOL);
 
 
-
 void
 stInitStrace(CStView *inView)
 /*++
@@ -153,7 +156,6 @@ Routine Description:
     gView = inView;
     stObtainSeDebugPrivilege();
 }
-
 
 void
 stPrematureTracerExit()
@@ -172,11 +174,15 @@ Routine Description:
         IhuUninjectDll(ghProcess, (LPCWSTR)gInjectorDllPath.c_str());
     }
 
+    if (gUseSharedMemory)
+    {
+        gTerminateCaptureThread = true;
+        WaitForSingleObject(gCaptureThreadHandle, INFINITE);
+        ihiCloseSharedMemory(&gTraceMemory);
+    }
+
     gView->PrintMessage(L"Tracing of the process stopped.\n");
 }
-
-
-
 
 void
 stShowUsage()
@@ -188,9 +194,9 @@ Routine Description:
 
 --*/
 {
-    gView->PrintMessage(L"StraceNT [-f <FilterFile>] [-e] [-d] [-l <LogLevel>] [[-n <ProcName>] | [-p <PID>] | [<Cmd [...]>]]\n");
+    gView->PrintMessage(L"StraceNT [-d] [-e] [-f <FilterFile>] [-l <LogLevel>] [[-n <ProcName>] | [-p <PID>] | [<Cmd [...]>]]\n");
     gView->PrintMessage(L"\nOptions:\n\n");
-    gView->PrintMessage(L"-d                Use only debug output for traces\n");
+	gView->PrintMessage(L"-d                Only use debug output for traces\n");
     gView->PrintMessage(L"-e                Enable Anti-Debug Measures\n");
     gView->PrintMessage(L"-f <FilterFile>   Filter data file (see stFilter.txt for details)\n");
     gView->PrintMessage(L"-l <LogLevel>     Log Level (0 - None, 1 - Errors <default>, 2 - Info, 3 - All)\n");
@@ -200,11 +206,8 @@ Routine Description:
     gView->PrintMessage(L"\n");
 }
 
-
-
 void
-stHandleError(
-    DWORD   inErrorCode)
+stHandleError(DWORD inErrorCode)
 /*++
 
 Routine Description:
@@ -254,7 +257,6 @@ Routine Description:
     }
 }
 
-
 BOOL
 stObtainSeDebugPrivilege(void)
 /*++
@@ -296,17 +298,9 @@ Return:
     tp.Privileges[0].Luid       = luidPrivilege;
     tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
-    fStatus = AdjustTokenPrivileges(
-                                hToken,
-                                FALSE,
-                                &tp,
-                                0,
-                                NULL,
-                                NULL);
-
+    fStatus = AdjustTokenPrivileges(hToken, FALSE, &tp, 0, NULL, NULL);
 
 funcEnd:
-
     if (hToken)
     {
         CloseHandle(hToken);
@@ -315,17 +309,16 @@ funcEnd:
     return fStatus;
 }
 
-
 DWORD
 WINAPI
 CaptureThread(LPVOID inParam)
 {
     do
     {
-        while (ihiRingBufferIsEmpty(gTraceRingBuffer))
+        if (ihiRingBufferIsEmpty(gTraceRingBuffer))
         {
-            // gView->PrintTrace(L"-");
-            Sleep(1);
+			Sleep(1);
+			goto LoopAgain;
         }
         PST_TRACE_DATA trcData;
         trcData = &gTraceBuffer[gTraceRingBuffer->Head];
@@ -348,11 +341,170 @@ CaptureThread(LPVOID inParam)
         }
         trcData->IsReady = FALSE;
         ihiRingBufferFree(gTraceRingBuffer);
-    } while (true);
+
+	LoopAgain:
+		;
+    } while (!gTerminateCaptureThread);
 
     return 0;
 }
 
+bool
+stCreateTemporaryInjectorDll()
+{
+	HRSRC       hRes;
+	HGLOBAL     hResG;
+	LPVOID      pRes;
+	DWORD       dwResSize;
+
+	hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_BIN_DLL), L"BIN");
+	hResG = LoadResource(NULL, hRes);
+	pRes = LockResource(hResG);
+	dwResSize = SizeofResource(NULL, hRes);
+
+	wchar_t tempPath[MAX_PATH];
+	wchar_t tempFile[MAX_PATH];
+	GetTempPath(MAX_PATH, tempPath);
+	GetTempFileName(tempPath, L"", 0, tempFile);
+
+	gInjectorDllPath = tempFile;
+
+	HANDLE oFile = CreateFile(gInjectorDllPath.c_str(),
+						      GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (oFile == INVALID_HANDLE_VALUE)
+	{
+		gView->PrintError(
+			L"Failed to create the temporary DLL [%s]. Error code = %x\n",
+			gInjectorDllPath.c_str(),
+			GetLastError());
+		return false;
+	}
+
+	DWORD bytesWritten;
+	if (!WriteFile(oFile, pRes, dwResSize, &bytesWritten, NULL))
+	{
+		gView->PrintError(
+			L"Failed to write the temporary DLL. Error code = %x\n",
+			GetLastError());
+		return false;
+	}
+	CloseHandle(oFile);
+	return true;
+}
+
+void
+stGeneratePermanentInjectorDllPath()
+{
+	wchar_t exePath[MAX_PATH];
+	if (GetModuleFileName(NULL, exePath, MAX_PATH))
+	{
+		std::wstring dllPath = exePath;
+		int slashPos = dllPath.find_last_of(L'\\');
+		if (slashPos != -1)
+		{
+			dllPath = dllPath.substr(0, slashPos + 1);
+		}
+		dllPath += L"stserum.dll";
+
+		gInjectorDllPath = dllPath;
+	}
+}
+
+bool
+stSetupTraceAndInfectTarget(std::string &fnIncludes, std::string &fnExcludes)
+{
+	PST_TRACE_OPTIONS trcOptions;
+	ULONG trcOptionsSize;
+	ULONG incListSize;
+	ULONG excListSize;
+
+	//
+	// NOTE: We assume here that string is in ANSI.
+	//
+	incListSize = fnIncludes.length() + 1;
+	excListSize = fnExcludes.length() + 1;
+	trcOptionsSize = sizeof(ST_TRACE_OPTIONS)+incListSize + excListSize;
+
+	trcOptions = (PST_TRACE_OPTIONS)malloc(trcOptionsSize);
+	if (trcOptions == NULL)
+	{
+		gView->PrintError(
+			L"Failed to allocate memory. Error code = %x\n",
+			GetLastError());
+		return false;
+	}
+	memset(trcOptions, 0, trcOptionsSize);
+
+	//
+	// Create shared memory block for information sharing.
+	//
+	LUID luid;
+	if (!AllocateLocallyUniqueId(&luid))
+	{
+		gView->PrintError(
+			L"Failed to allocate unique id for shared memory. Error code = %x\n",
+			GetLastError());
+		return false;
+	}
+
+	ULONG trcBufferCount;
+	trcBufferCount = 0;
+
+	if (!gOnlyUseDebugOutput)
+	{
+		wchar_t shmName[64];
+		wsprintf(shmName, L"%08x%08x", luid.HighPart, luid.LowPart);
+		ULONG shmSize;
+
+		trcBufferCount = 1024 * 1024;
+		shmSize = sizeof(IHI_RING_BUFFER)+sizeof(ST_TRACE_DATA)* trcBufferCount;
+		if (ihiCreateSharedMemory(shmName, shmSize, &gTraceMemory))
+		{
+			gTraceRingBuffer = (PIHI_RING_BUFFER)gTraceMemory.Memory;
+			gTraceBuffer = (PST_TRACE_DATA)((PUCHAR)gTraceRingBuffer + sizeof(IHI_RING_BUFFER));
+			ihiRingBufferInit(gTraceRingBuffer, trcBufferCount, FALSE);
+			DWORD threadId;
+			gCaptureThreadHandle = CreateThread(NULL, 0, CaptureThread, NULL, 0, &threadId);
+			if (gCaptureThreadHandle == NULL)
+			{
+				gView->PrintError(
+					L"Failed to create shared memory capture thread. Error code = %x\n"
+					L"Falling back to using OutputDebugString.\n",
+					GetLastError());
+				ihiCloseSharedMemory(&gTraceMemory);
+			}
+			else
+			{
+				gUseSharedMemory = true;
+			}
+		}
+		else
+		{
+			gView->PrintError(
+				L"Failed to create shared memory. Error code = %x\n"
+				L"Falling back to using OutputDebugString.\n",
+				GetLastError());
+		}
+	}
+
+	trcOptions->EnableAntiDebugMeasures = gEnableAntiDebugMeasures;
+	trcOptions->EnableDebugging = gEnableDebugging;
+	trcOptions->LoggingLevel = gLoggingLevel;
+	trcOptions->UseSharedMemory = gUseSharedMemory;
+	trcOptions->TraceMemoryLuid = luid;
+	trcOptions->TraceBufferCount = trcBufferCount;
+	trcOptions->IncludeListOffset = sizeof(ST_TRACE_OPTIONS);
+	trcOptions->ExcludeListOffset = trcOptions->IncludeListOffset + incListSize;
+	strcpy((PCHAR)trcOptions + trcOptions->IncludeListOffset, fnIncludes.c_str());
+	strcpy((PCHAR)trcOptions + trcOptions->ExcludeListOffset, fnExcludes.c_str());
+
+	IhuInjectDll(ghProcess, (LPCWSTR)gInjectorDllPath.c_str(), trcOptions,
+		         trcOptionsSize);
+
+	free(trcOptions);
+	return true;
+}
 
 void
 stAttachDebugger(
@@ -439,146 +591,20 @@ Arguments:
                             {
                                 if (!gEnableDebugging)
                                 {
-                                    HRSRC       hRes;
-                                    HGLOBAL     hResG;
-                                    LPVOID      pRes;
-                                    DWORD       dwResSize;
-
-                                    hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_BIN_DLL), L"BIN");
-                                    hResG = LoadResource(NULL, hRes);
-                                    pRes = LockResource(hResG);
-                                    dwResSize = SizeofResource(NULL, hRes);
-
-                                    wchar_t tempPath[MAX_PATH];
-                                    wchar_t tempFile[MAX_PATH];
-                                    GetTempPath(MAX_PATH, tempPath);
-                                    GetTempFileName(tempPath, L"", 0, tempFile);
-
-                                    gInjectorDllPath = tempFile;
-
-                                    HANDLE oFile = CreateFile(
-                                        gInjectorDllPath.c_str(),
-                                        GENERIC_READ | GENERIC_WRITE,
-                                        0,
-                                        NULL,
-                                        CREATE_ALWAYS,
-                                        FILE_ATTRIBUTE_NORMAL,
-                                        NULL);
-
-                                    if (oFile == INVALID_HANDLE_VALUE)
-                                    {
-                                        gView->PrintError(
-                                            L"Failed to create the temporary DLL [%s]. Error code = %x\n",
-                                            gInjectorDllPath.c_str(),
-                                            GetLastError());
-                                        return;
-                                    }
-
-                                    DWORD bytesWritten;
-                                    if (!WriteFile(oFile, pRes, dwResSize, &bytesWritten, NULL))
-                                    {
-                                        gView->PrintError(
-                                            L"Failed to write the temporary DLL. Error code = %x\n",
-                                            GetLastError());
-                                        return;
-                                    }
-                                    CloseHandle(oFile);
+									if (!stCreateTemporaryInjectorDll())
+									{
+										return;
+									}
                                 }
                                 else
                                 {
-                                    wchar_t exePath[MAX_PATH];
-
-                                    if (GetModuleFileName(NULL, exePath, MAX_PATH))
-                                    {
-                                        std::wstring dllPath = exePath;
-                                        int slashPos = dllPath.find_last_of(L'\\');
-                                        if (slashPos != -1)
-                                        {
-                                            dllPath = dllPath.substr(0, slashPos + 1);
-                                        }
-                                        dllPath += L"stserum.dll";
-
-                                        gInjectorDllPath = dllPath;
-                                    }
+									stGeneratePermanentInjectorDllPath();
                                 }
 
-                                //
-                                // Create the parameter block and pass it to IhuInjectDll
-                                //
-                                PST_TRACE_OPTIONS trcOptions;
-                                ULONG trcOptionsSize;
-                                ULONG incListSize;
-                                ULONG excListSize;
-
-                                //
-                                // NOTE: We assume here that string is in ANSI.
-                                //
-                                incListSize = fnIncludes.length() + 1;
-                                excListSize = fnExcludes.length() + 1;
-                                trcOptionsSize = sizeof(ST_TRACE_OPTIONS) + incListSize + excListSize;
-
-                                trcOptions = (PST_TRACE_OPTIONS)malloc(trcOptionsSize);
-                                if (trcOptions == NULL)
+								if (stSetupTraceAndInfectTarget(fnIncludes, fnExcludes))
                                 {
-                                    gView->PrintError(
-                                        L"Failed to allocate memory. Error code = %x\n",
-                                        GetLastError());
-                                    return;
+                                    processInfected = true;
                                 }
-                                memset(trcOptions, 0, trcOptionsSize); 
-
-                                //
-                                // Create shared memory block for information sharing.
-                                //
-                                LUID luid;
-                                if (!AllocateLocallyUniqueId(&luid))
-                                {
-                                    gView->PrintError(
-                                        L"Failed to allocate unique id for shared memory. Error code = %x\n",
-                                        GetLastError());
-                                    return;
-                                }
-
-                                if (!gOnlyUseDebugOutput)
-                                {
-                                    wchar_t shmName[64];
-                                    wsprintf(shmName, L"%08x%08x", luid.HighPart, luid.LowPart);
-                                    ULONG shmSize;
-                                    shmSize = sizeof(IHI_RING_BUFFER) + sizeof(ST_TRACE_DATA) * 65536;
-                                    if (ihiCreateSharedMemory(shmName, shmSize, &gTraceMemory))
-                                    {
-                                        gUseSharedMemory = true;
-                                        gTraceRingBuffer = (PIHI_RING_BUFFER)gTraceMemory.Memory;
-                                        gTraceBuffer = (PST_TRACE_DATA)((PUCHAR)gTraceRingBuffer + sizeof(IHI_RING_BUFFER));
-                                        ihiRingBufferInit(gTraceRingBuffer, 65536, FALSE);
-                                        DWORD threadId;
-                                        CreateThread(NULL, 0, CaptureThread, NULL, 0, &threadId);
-                                    }
-                                    else
-                                    {
-                                        gView->PrintError(
-                                            L"Failed to create shared memory. Error code = %x\n"
-                                            L"Falling back to using OutputDebugString.\n",
-                                            GetLastError());
-                                    }
-                                }
-
-                                trcOptions->EnableAntiDebugMeasures = gEnableAntiDebugMeasures;
-                                trcOptions->EnableDebugging = gEnableDebugging;
-                                trcOptions->LoggingLevel = gLoggingLevel;
-                                trcOptions->UseSharedMemory = gUseSharedMemory;
-                                trcOptions->TraceMemoryLuid = luid;
-                                trcOptions->TraceBufferCount = 65536;
-                                trcOptions->IncludeListOffset = sizeof(ST_TRACE_OPTIONS);
-                                trcOptions->ExcludeListOffset = trcOptions->IncludeListOffset + incListSize;
-                                strcpy((PCHAR)trcOptions + trcOptions->IncludeListOffset, fnIncludes.c_str());
-                                strcpy((PCHAR)trcOptions + trcOptions->ExcludeListOffset, fnExcludes.c_str());
-
-                                IhuInjectDll(ghProcess, (LPCWSTR)gInjectorDllPath.c_str(),
-                                             trcOptions, trcOptionsSize);
-
-                                free(trcOptions);
-                                processInfected = true;
                             }
 
                             break;
@@ -630,6 +656,13 @@ Arguments:
                 }
                 case EXIT_PROCESS_DEBUG_EVENT:
                 {
+					if (gUseSharedMemory)
+					{
+						gTerminateCaptureThread = true;
+						WaitForSingleObject(gCaptureThreadHandle, INFINITE);
+						ihiCloseSharedMemory(&gTraceMemory);
+					}
+
                     gView->PrintMessage(
                         L"Target process has been terminated. Exit Code = %d.\n",
                         debugEvent.u.ExitProcess.dwExitCode);
@@ -713,8 +746,61 @@ funcExit:
     return;
 }
 
+void
+stProcessFilterFile(std::wstring &FilterFileName, std::string &fnIncludes,
+                    std::string &fnExcludes)
+{
+	FILE *filterFile;
 
+	filterFile = _wfopen(FilterFileName.c_str(), L"rt");
 
+	if (filterFile)
+	{
+		char szLine[1024];
+
+		while (fgets(szLine, 1024, filterFile))
+		{
+			std::string filterLine = szLine;
+
+			if (!filterLine.empty())
+			{
+				//
+				// Ignore comment lines - lines starting with a #
+				//
+				if (filterLine[0] != '#')
+				{
+					if (filterLine[filterLine.length() - 1] == '\n')
+					{
+						filterLine[filterLine.length() - 1] = 0;
+					}
+
+					if (!filterLine.empty())
+					{
+						if (filterLine.find("INCLUDES=", 0) == 0)
+						{
+							fnIncludes += "<";
+							fnIncludes += filterLine.substr(sizeof("INCLUDES=") - 1).c_str();
+							fnIncludes += ">";
+						}
+						else if (filterLine.find("EXCLUDES=", 0) == 0)
+						{
+							fnExcludes += "<";
+							fnExcludes += filterLine.substr(sizeof("EXCLUDES=") - 1).c_str();
+							fnExcludes += ">";
+						}
+					}
+				}
+			}
+		}
+
+		fclose(filterFile);
+	}
+	else
+	{
+		gView->PrintError(L"Could not open the filter file (%s).", FilterFileName.c_str());
+		stHandleError(GetLastError());
+	}
+}
 
 void
 stProcessArguments(
@@ -729,24 +815,6 @@ Routine Description:
 
 --*/
 {
-#if 1
-    IHI_RING_BUFFER rb;
-    ULONG index;
-    ihiRingBufferInit(&rb, 64, TRUE);
-    ihiRingBufferAllocate(&rb, &index);
-    ihiRingBufferFree(&rb);
-    ihiRingBufferAllocate(&rb, &index);
-    ihiRingBufferAllocate(&rb, &index);
-    ihiRingBufferFree(&rb);
-    ihiRingBufferFree(&rb);
-#endif
-    //
-    // First thing is to initialize all global variables
-    //
-    ghProcess           = INVALID_HANDLE_VALUE;
-    gEnableDebugging    = false;
-    gInjectorDllPath    = L"";
-
     COMMAND_LINE_ACTION userAction = CMD_TRACE_NONE;
     std::wstring        userParam;
 
@@ -793,8 +861,8 @@ Routine Description:
         {
             gEnableAntiDebugMeasures = true;
         }
-        else if (_wcsicmp(argV[indexArgs], L"-e") == 0 ||
-                 _wcsicmp(argV[indexArgs], L"/e") == 0)
+        else if (_wcsicmp(argV[indexArgs], L"-d") == 0 ||
+                 _wcsicmp(argV[indexArgs], L"/d") == 0)
         {
             gOnlyUseDebugOutput = true;
         }
@@ -915,58 +983,8 @@ Routine Description:
 
 
     if (!filterFileName.empty())
-    {
-        // Read this file into memory and read
-        // the exclusion, inclusion list
-        FILE *filterFile;
-
-        filterFile = _wfopen(filterFileName.c_str(), L"rt");
-
-        if (filterFile)
-        {
-            char szLine[1024];
-
-            while (fgets(szLine, 1024, filterFile))
-            {
-                std::string filterLine = szLine;
-
-                if (!filterLine.empty())
-                {
-                    // Ignore commented lines, which start with a #
-                    if (filterLine[0] != '#')
-                    {
-                        if (filterLine[filterLine.length() - 1] == '\n')
-                        {
-                            filterLine[filterLine.length() - 1] = 0;
-                        }
-
-                        if (!filterLine.empty())
-                        {
-                            if (filterLine.find("INCLUDES=", 0) == 0)
-                            {
-                                fnIncludes += "<";
-                                fnIncludes += filterLine.substr(sizeof("INCLUDES=") - 1).c_str();
-                                fnIncludes += ">";
-                            }
-                            else if(filterLine.find("EXCLUDES=", 0) == 0)
-                            {
-                                fnExcludes += "<";
-                                fnExcludes += filterLine.substr(sizeof("EXCLUDES=") -  1).c_str();
-                                fnExcludes += ">";
-                            }
-                        }
-                    }
-                }
-            }
-
-            fclose(filterFile);
-        }
-        else
-        {
-            gView->PrintError(L"Could not open the filter file (%s).", filterFileName.c_str());
-            stHandleError(GetLastError());
-            goto funcExit;
-        }
+	{
+		stProcessFilterFile(filterFileName, fnIncludes, fnExcludes);
     }
 
     bool activeProcess = true;
@@ -979,28 +997,22 @@ Routine Description:
     {
         stShowUsage();
     }
-    else if (   userAction == CMD_TRACE_NEW_PROC ||
-                userAction == CMD_TRACE_BY_PID ||
-                userAction == CMD_TRACE_BY_PNAME)
+    else if (userAction == CMD_TRACE_NEW_PROC ||
+             userAction == CMD_TRACE_BY_PID ||
+             userAction == CMD_TRACE_BY_PNAME)
     {
         DWORD processId = 0;
 
         if (userAction == CMD_TRACE_NEW_PROC)
         {
             gView->PrintMessage(L"Tracing command: [%s]\n", userParam.c_str());
-
-            processId = IhuLaunchNewProcess(
-                                        (LPCWSTR)userParam.c_str());
-
-            // This is a new process, so set activeProcess = false
+            processId = IhuLaunchNewProcess((LPCWSTR)userParam.c_str());
             activeProcess =  false;
         }
         else if(userAction == CMD_TRACE_BY_PID)
         {
             processId = wcstoul(userParam.c_str(), NULL, 10);
-
             gView->PrintMessage(L"Tracing process with PID: [%d]\n", processId);
-
             if (processId == 0)
             {
                 stHandleError(ERR_INVALID_PROCESS_ID);
@@ -1010,20 +1022,13 @@ Routine Description:
         else if(userAction == CMD_TRACE_BY_PNAME)
         {
             gView->PrintMessage(L"Tracing process: [%s]\n", userParam.c_str());
-
-            processId = IhuGetProcessIdByName(
-                                        (LPCWSTR)userParam.c_str());
+            processId = IhuGetProcessIdByName((LPCWSTR)userParam.c_str());
         }
 
         if (processId)
         {
             IhuSetDbgLogLevel(gLoggingLevel);
-
-            stAttachDebugger(
-                        processId,
-                        fnIncludes,
-                        fnExcludes,
-                        activeProcess);
+            stAttachDebugger(processId, fnIncludes, fnExcludes, activeProcess);
         }
         else
         {
@@ -1037,7 +1042,7 @@ Routine Description:
     }
 
 funcExit:
+
     return;
 }
-
 
