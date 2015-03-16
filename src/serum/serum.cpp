@@ -143,8 +143,8 @@ IhSerumLoad(PVOID inContext, ULONG inContextSize)
         else
         {
             IHU_DBG_LOG_EX(TRC_INJECTOR, IHU_LEVEL_FATAL,
-                L"Failed to open shared memory (Error: %x), patching cannot continue.\n"
-                L"Please try again with command-line option -t.\n", GetLastError());
+                L"Failed to open shared memory (Error: %x), using OutputDebugString as fallback.\n",
+                GetLastError());
         }
     }
 

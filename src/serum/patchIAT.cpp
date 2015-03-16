@@ -577,8 +577,13 @@ ihiPatchedFuncEntry(
 
     ULONG trcIndex;
     PST_TRACE_DATA trcData;
-    if (gUseSharedMemory && ihiRingBufferAllocate(gTraceRingBuffer, &trcIndex))
-    {
+	if (gUseSharedMemory)
+	{
+		while (!ihiRingBufferAllocate(gTraceRingBuffer, &trcIndex))
+		{
+			Sleep(1);
+		}
+
         trcData = &gTraceBuffer[trcIndex];
         trcData->TraceType = ST_TRACE_FUNCTION_CALL;
         strncpy(trcData->FunctionName, funcName, sizeof(trcData->FunctionName) - 1);
