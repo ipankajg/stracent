@@ -104,7 +104,7 @@ IhSerumLoad(PVOID inContext, ULONG inContextSize)
 {
     PST_TRACE_OPTIONS trcOptions;
     DWORD osVersion;
-    
+
     trcOptions = (PST_TRACE_OPTIONS)inContext;
 
     //

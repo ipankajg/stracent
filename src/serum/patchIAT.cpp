@@ -97,6 +97,11 @@ ihiInitPatchCode(
 // hooking
 #pragma check_stack(off)
 
+// Disable all runtime checks because they check ESP etc. which
+// does not work inside our custom patch functions due to stack
+// manipulation.
+#pragma runtime_checks("", off)
+
 // Turn optimizations off for the patching functions
 #pragma optimize("g", off)
 
@@ -577,12 +582,12 @@ ihiPatchedFuncEntry(
 
     ULONG trcIndex;
     PST_TRACE_DATA trcData;
-	if (gUseSharedMemory)
-	{
-		while (!ihiRingBufferAllocate(gTraceRingBuffer, &trcIndex))
-		{
-			Sleep(1);
-		}
+    if (gUseSharedMemory)
+    {
+	    while (!ihiRingBufferAllocate(gTraceRingBuffer, &trcIndex))
+        {
+            SwitchToThread();
+        }
 
         trcData = &gTraceBuffer[trcIndex];
         trcData->TraceType = ST_TRACE_FUNCTION_CALL;
@@ -788,6 +793,7 @@ ihiPatchedFuncEntry(
 
 #pragma warning(pop)
 #pragma optimize("g", on)
+#pragma runtime_checks("", restore)
 #pragma check_stack(on)
 
 
