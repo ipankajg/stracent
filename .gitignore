@@ -58,6 +58,7 @@ dlldata.c
 *.svclog
 *.scc
 *.swp
+*.zip
 
 # Windows Store app package directory
 AppPackages/
