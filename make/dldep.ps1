@@ -1,5 +1,5 @@
 $file = "ihulib.zip"
-$url = "https://github.com/intellectualheaven/ihulib/releases/download/v1.1/ihulib_v_1_1.zip"
+$url = "https://github.com/intellectualheaven/ihulib/releases/download/v1.1.1/ihulib.zip"
 $clnt = new-object System.Net.WebClient
 
 [bool]$downloadFile = $False
@@ -26,5 +26,7 @@ If ($downloadFile) {
     $fileItem = Get-Item $file
     $fileItem.LastWriteTime = $lastModified
     Write-Host "unzip $file ..."
-    Start-Process $PSScriptRoot\unzip.exe $file -Wait
+    $prg = "$PSScriptRoot\unzip.exe"
+    $arg = "-o $file"
+    Start-Process -FilePath "$prg" -ArgumentList "$arg" -Wait
 }
